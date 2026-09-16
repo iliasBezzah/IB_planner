@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>IB Planner — Login</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Scrollable page ── */
+    html { height: 100%; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      min-height: 100%;
+      background: linear-gradient(135deg, #0D47A1 0%, #1565C0 45%, #0288D1 100%);
+      background-attachment: fixed;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 30px 16px 40px;
+      position: relative;
+      overflow-y: auto;   /* ← scrollable */
+    }
+
+    /* Decorative circles */
+    body::before, body::after {
+      content: '';
+      position: fixed;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.05);
+      pointer-events: none;
+      z-index: 0;
+    }
+    body::before { width: 500px; height: 500px; top: -150px; right: -100px; }
+    body::after  { width: 350px; height: 350px; bottom: -120px; left: -80px; }
+
+    .login-wrapper {
+      width: 100%;
+      max-width: 440px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Logo ── */
+    .logo-section {
+      text-align: center;
+      margin-bottom: 24px;
+      color: #fff;
+    }
+    .logo-badge {
+      width: 68px; height: 68px;
+      background: rgba(255,255,255,0.18);
+      border: 2.5px solid rgba(255,255,255,0.5);
+      border-radius: 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: -2px;
+      margin-bottom: 10px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    }
+    .logo-title { font-size: 21px; font-weight: 800; }
+    .logo-sub   { font-size: 12px; opacity: 0.8; margin-top: 3px; }
+
+    /* ── Card ── */
+    .card {
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+      overflow: hidden;
+    }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      background: #F0F7FF;
+      border-bottom: 1px solid #BBDEFB;
+    }
+    .tab-btn {
+      padding: 15px;
+      border: none;
+      background: none;
+      font-size: 14px;
+      font-weight: 600;
+      color: #546E7A;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      border-bottom: 3px solid transparent;
+    }
+    .tab-btn.active {
+      color: #1565C0;
+      border-bottom-color: #1565C0;
+      background: #fff;
+    }
+    .tab-btn:hover:not(.active) { color: #1976D2; }
+
+    /* ── Forms ── */
+    .form-panel { display: none; padding: 26px 28px; }
+    .form-panel.active { display: block; }
+
+    .form-title    { font-size: 18px; font-weight: 800; color: #0D1B2A; margin-bottom: 4px; }
+    .form-subtitle { font-size: 13px; color: #546E7A; margin-bottom: 20px; }
+
+    .form-group { margin-bottom: 14px; }
+    .form-group label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: #546E7A;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 5px;
+    }
+
+    /* ── Input wrap ── */
+    .input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .input-icon {
+      position: absolute;
+      left: 12px;
+      color: #90A4AE;
+      font-size: 14px;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .input-wrap input,
+    .input-wrap select {
+      width: 100%;
+      padding: 10px 42px 10px 36px; /* right pad for eye button */
+      border: 1.5px solid #BBDEFB;
+      border-radius: 10px;
+      font-size: 14px;
+      color: #0D1B2A;
+      background: #F8FBFF;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      font-family: inherit;
+      appearance: none;
+    }
+    /* Select doesn't need right padding for eye */
+    .input-wrap select { padding-right: 14px; cursor: pointer; }
+    .input-wrap input:focus,
+    .input-wrap select:focus {
+      outline: none;
+      border-color: #1565C0;
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(21,101,192,0.1);
+    }
+    .input-wrap input.error { border-color: #C62828; box-shadow: 0 0 0 3px rgba(198,40,40,0.1); }
+
+    /* ── Eye button — FIXED ── */
+    .toggle-pw {
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 40px;
+      background: none;
+      border: none;
+      color: #90A4AE;
+      cursor: pointer;
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.2s;
+      z-index: 2;
+    }
+    .toggle-pw:hover { color: #1565C0; }
+
+    /* ── Role selector ── */
+    .role-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .role-card {
+      border: 2px solid #BBDEFB;
+      border-radius: 12px;
+      padding: 14px 10px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: #F8FBFF;
+      position: relative;
+    }
+    .role-card:hover { border-color: #1565C0; background: #EBF3FB; }
+    .role-card.selected {
+      border-color: #1565C0;
+      background: #EBF3FB;
+      box-shadow: 0 0 0 3px rgba(21,101,192,0.12);
+    }
+    .role-card input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      width: 0; height: 0;
+    }
+    .role-icon { font-size: 26px; display: block; margin-bottom: 6px; }
+    .role-label { font-size: 12px; font-weight: 700; color: #0D1B2A; }
+    .role-sub   { font-size: 10px; color: #546E7A; margin-top: 2px; }
+
+    /* ── Password rules checklist ── */
+    .pw-rules {
+      background: #F0F7FF;
+      border: 1px solid #BBDEFB;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-top: 8px;
+      display: none;
+    }
+    .pw-rules.show { display: block; }
+    .pw-rule {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+      color: #546E7A;
+      padding: 2px 0;
+      transition: color 0.2s;
+    }
+    .pw-rule i {
+      font-size: 11px;
+      width: 14px;
+      text-align: center;
+      color: #90A4AE;
+      transition: color 0.2s;
+    }
+    .pw-rule.ok         { color: #2E7D32; }
+    .pw-rule.ok i       { color: #2E7D32; }
+    .pw-rule.fail i     { color: #C62828; }
+
+    /* ── Error messages ── */
+    .error-msg {
+      font-size: 11px;
+      color: #C62828;
+      margin-top: 5px;
+      display: none;
+      align-items: center;
+      gap: 4px;
+    }
+    .error-msg.show { display: flex; }
+
+    /* ── Remember me ── */
+    .remember-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+    .remember-row input[type="checkbox"] {
+      width: 16px; height: 16px;
+      accent-color: #1565C0;
+      cursor: pointer;
+    }
+    .remember-row label { font-size: 13px; color: #546E7A; cursor: pointer; margin: 0; }
+
+    /* ── Alert ── */
+    .alert {
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 14px;
+      display: none;
+      align-items: center;
+      gap: 8px;
+    }
+    .alert.show { display: flex; }
+    .alert.error   { background: #FFEBEE; color: #C62828; border: 1px solid #FFCDD2; }
+    .alert.success { background: #E8F5E9; color: #2E7D32; border: 1px solid #C8E6C9; }
+
+    /* ── Submit button ── */
+    .btn-submit {
+      width: 100%;
+      padding: 13px;
+      background: linear-gradient(135deg, #1565C0, #0288D1);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn-submit:hover {
+      background: linear-gradient(135deg, #0D47A1, #1565C0);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(21,101,192,0.35);
+    }
+    .btn-submit:active { transform: none; }
+
+    /* ── Divider ── */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 14px 0;
+      color: #90A4AE;
+      font-size: 12px;
+    }
+    .divider::before, .divider::after {
+      content: ''; flex: 1;
+      height: 1px; background: #BBDEFB;
+    }
+
+    /* ── Switch link ── */
+    .switch-link {
+      text-align: center;
+      font-size: 13px;
+      color: #546E7A;
+      margin-top: 14px;
+    }
+    .switch-link a { color: #1565C0; font-weight: 700; cursor: pointer; }
+    .switch-link a:hover { text-decoration: underline; }
+
+    /* ── User chips ── */
+    .users-list { margin-bottom: 14px; }
+    .users-list-label {
+      font-size: 11px; font-weight: 700; color: #546E7A;
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+    }
+    .user-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .user-chip {
+      background: #EBF3FB; border: 1.5px solid #BBDEFB;
+      border-radius: 20px; padding: 5px 12px;
+      font-size: 12px; font-weight: 600; color: #1565C0;
+      cursor: pointer; transition: all 0.2s;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .user-chip:hover { background: #1565C0; color: #fff; border-color: #1565C0; }
+    .user-role-icon { font-size: 13px; }
+
+    /* ── Footer ── */
+    .login-footer {
+      text-align: center;
+      margin-top: 18px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.6);
+    }
+
+    @media(max-width: 480px) {
+      .form-panel { padding: 20px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="login-wrapper">
+
+  <!-- Logo -->
+  <div class="logo-section">
+    <div class="logo-badge">IB</div>
+    <div class="logo-title">IB Planner</div>
+    <div class="logo-sub">Full Day Academic Manager</div>
+  </div>
+
+  <!-- Card -->
+  <div class="card">
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" id="tabSignIn" onclick="switchTab('signin')">
+        <i class="fas fa-sign-in-alt"></i> Sign In
+      </button>
+      <button class="tab-btn" id="tabSignUp" onclick="switchTab('signup')">
+        <i class="fas fa-user-plus"></i> Sign Up
+      </button>
+    </div>
+
+    <!-- ══ SIGN IN ══ -->
+    <div class="form-panel active" id="panelSignIn">
+      <div class="form-title">Welcome back! 👋</div>
+      <div class="form-subtitle">Sign in to continue to your planner</div>
+
+      <!-- Existing accounts quick-pick -->
+      <div class="users-list" id="existingUsersList" style="display:none">
+        <div class="users-list-label"><i class="fas fa-users"></i> Accounts on this device</div>
+        <div class="user-chips" id="userChips"></div>
+        <div class="divider">or type manually</div>
+      </div>
+
+      <div class="alert error" id="signinAlert">
+        <i class="fas fa-exclamation-circle"></i>
+        <span id="signinAlertMsg"></span>
+      </div>
+
+      <div class="form-group">
+        <label>Username</label>
+        <div class="input-wrap">
+          <i class="fas fa-user input-icon"></i>
+          <input type="text" id="siUsername" autocomplete="username"/>
+        </div>
+        <div class="error-msg" id="siUsernameErr"><i class="fas fa-times-circle"></i><span></span></div>
+      </div>
+
+      <div class="form-group">
+        <label>Password</label>
+        <div class="input-wrap">
+          <i class="fas fa-lock input-icon"></i>
+          <input type="password" id="siPassword" autocomplete="current-password"/>
+          <button class="toggle-pw" type="button" onclick="togglePw('siPassword', this)">
+            <i class="fas fa-eye"></i>
+          </button>
+        </div>
+        <div class="error-msg" id="siPasswordErr"><i class="fas fa-times-circle"></i><span></span></div>
+      </div>
+
+      <div class="remember-row">
+        <input type="checkbox" id="rememberMe" checked/>
+        <label for="rememberMe">Remember me on this device</label>
+      </div>
+
+      <button class="btn-submit" onclick="signIn()">
+        <i class="fas fa-sign-in-alt"></i> Sign In
+      </button>
+
+      <div class="switch-link">
+        No account yet? <a onclick="switchTab('signup')">Create one →</a>
+      </div>
+    </div>
+
+    <!-- ══ SIGN UP ══ -->
+    <div class="form-panel" id="panelSignUp">
+      <div class="form-title">Create an account 🎓</div>
+      <div class="form-subtitle">Fill in your details to get started</div>
+
+      <div class="alert error"   id="signupAlertErr"><i class="fas fa-exclamation-circle"></i><span id="signupAlertErrMsg"></span></div>
+      <div class="alert success" id="signupAlertOk"> <i class="fas fa-check-circle"></i><span id="signupAlertOkMsg"></span></div>
+
+      <!-- Role selector -->
+      <div class="form-group">
+        <label>I am a</label>
+        <div class="role-group">
+          <label class="role-card selected" id="roleStudent" onclick="selectRole('student')">
+            <input type="radio" name="role" value="student" checked/>
+            <span class="role-icon">🎓</span>
+            <div class="role-label">Student</div>
+            <div class="role-sub">Lectures, assignments, exams</div>
+          </label>
+          <label class="role-card" id="roleTeacher" onclick="selectRole('teacher')">
+            <input type="radio" name="role" value="teacher"/>
+            <span class="role-icon">👨‍🏫</span>
+            <div class="role-label">Teacher / Dr.</div>
+            <div class="role-sub">Classes, preparation, research</div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Full name -->
+      <div class="form-group">
+        <label>Full Name</label>
+        <div class="input-wrap">
+          <i class="fas fa-id-card input-icon"></i>
+          <input type="text" id="suName" autocomplete="name"/>
+        </div>
+        <div class="error-msg" id="suNameErr"><i class="fas fa-times-circle"></i><span></span></div>
+      </div>
+
+      <!-- Username -->
+      <div class="form-group">
+        <label>Username</label>
+        <div class="input-wrap">
+          <i class="fas fa-at input-icon"></i>
+          <input type="text" id="suUsername" autocomplete="username"
+            oninput="this.value=this.value.toLowerCase().replace(/\s/g,'')"/>
+        </div>
+        <div class="error-msg" id="suUsernameErr"><i class="fas fa-times-circle"></i><span></span></div>
+      </div>
+
+      <!-- Password -->
+      <div class="form-group">
+        <label>Password</label>
+        <div class="input-wrap">
+          <i class="fas fa-lock input-icon"></i>
+          <input type="password" id="suPassword" autocomplete="new-password"
+            oninput="checkPwRules(this.value)"/>
+          <button class="toggle-pw" type="button" onclick="togglePw('suPassword', this)">
+            <i class="fas fa-eye"></i>
+          </button>
+        </div>
+        <!-- Live rules checklist -->
+        <div class="pw-rules" id="pwRules">
+          <div class="pw-rule" id="rule-len"><i class="fas fa-circle"></i> At least 8 characters</div>
+          <div class="pw-rule" id="rule-upper"><i class="fas fa-circle"></i> At least one uppercase letter (A–Z)</div>
+          <div class="pw-rule" id="rule-num"><i class="fas fa-circle"></i> At least one number (0–9)</div>
+          <div class="pw-rule" id="rule-special"><i class="fas fa-circle"></i> At least one special character (! @ # …)</div>
+        </div>
+        <div class="error-msg" id="suPasswordErr"><i class="fas fa-times-circle"></i><span></span></div>
+      </div>
+
+      <!-- Confirm password -->
+      <div class="form-group">
+        <label>Confirm Password</label>
+        <div class="input-wrap">
+          <i class="fas fa-lock input-icon"></i>
+          <input type="password" id="suConfirm" autocomplete="new-password"/>
+          <button class="toggle-pw" type="button" onclick="togglePw('suConfirm', this)">
+            <i class="fas fa-eye"></i>
+          </button>
+        </div>
+        <div class="error-msg" id="suConfirmErr"><i class="fas fa-times-circle"></i><span></span></div>
+      </div>
+
+      <button class="btn-submit" onclick="signUp()">
+        <i class="fas fa-user-plus"></i> Create Account
+      </button>
+
+      <div class="switch-link">
+        Already have an account? <a onclick="switchTab('signin')">Sign in →</a>
+      </div>
+    </div>
+
+  </div><!-- /card -->
+
+  <div class="login-footer">
+    <i class="fas fa-lock"></i> Your data is stored only on this device
+  </div>
+
+</div><!-- /login-wrapper -->
+
+<script>
+/* ══════════════════════════════════════════
+   IB Planner — Auth Logic
+══════════════════════════════════════════ */
+
+// ── Redirect if already logged in ──
+(function(){
+  try {
+    const s = sessionStorage.getItem('ib_session') || localStorage.getItem('ib_remember');
+    if (s) {
+      const u = JSON.parse(s);
+      if (u && u.username) window.location.replace('index.html');
+    }
+  } catch {}
+})();
+
+// ── Hash function (client-side) ──
+function hashPw(str) {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1>>>16), 2246822507) ^ Math.imul(h2 ^ (h2>>>13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2>>>16), 2246822507) ^ Math.imul(h1 ^ (h1>>>13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1>>>0)).toString(36);
+}
+
+function getUsers() { try { return JSON.parse(localStorage.getItem('ib_users') || '[]'); } catch { return []; } }
+function saveUsers(u) { localStorage.setItem('ib_users', JSON.stringify(u)); }
+
+// ── Role selector ──
+let selectedRole = 'student';
+function selectRole(role) {
+  selectedRole = role;
+  document.getElementById('roleStudent').classList.toggle('selected', role === 'student');
+  document.getElementById('roleTeacher').classList.toggle('selected', role === 'teacher');
+}
+
+// ── Tab switch ──
+function switchTab(tab) {
+  document.getElementById('panelSignIn').classList.toggle('active', tab === 'signin');
+  document.getElementById('panelSignUp').classList.toggle('active', tab === 'signup');
+  document.getElementById('tabSignIn').classList.toggle('active',   tab === 'signin');
+  document.getElementById('tabSignUp').classList.toggle('active',   tab === 'signup');
+  clearErrors();
+}
+
+// ── Eye toggle — FIXED ──
+function togglePw(inputId, btn) {
+  const inp     = document.getElementById(inputId);
+  const icon    = btn.querySelector('i');
+  const isHidden = inp.type === 'password';
+  inp.type       = isHidden ? 'text' : 'password';
+  icon.className = isHidden ? 'fas fa-eye-slash' : 'fas fa-eye';
+}
+
+// ── Error helpers ──
+function setErr(id, msg) {
+  const errEl = document.getElementById(id + 'Err');
+  if (errEl) { errEl.querySelector('span').textContent = msg; errEl.classList.add('show'); }
+  const inp = document.getElementById(id);
+  if (inp) inp.classList.add('error');
+}
+function clearErrors() {
+  document.querySelectorAll('.error-msg').forEach(e => {
+    e.classList.remove('show');
+    const s = e.querySelector('span'); if (s) s.textContent = '';
+  });
+  document.querySelectorAll('input').forEach(i => i.classList.remove('error'));
+  ['signinAlert','signupAlertErr','signupAlertOk'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.classList.remove('show');
+  });
+}
+function showAlert(id, msgId, msg) {
+  const el = document.getElementById(id); if (el) el.classList.add('show');
+  const m  = document.getElementById(msgId); if (m) m.textContent = msg;
+}
+
+// ── Password rules live check ──
+const PW_RULES = [
+  { id: 'rule-len',     test: pw => pw.length >= 8,                label: 'At least 8 characters' },
+  { id: 'rule-upper',   test: pw => /[A-Z]/.test(pw),              label: 'At least one uppercase letter (A–Z)' },
+  { id: 'rule-num',     test: pw => /[0-9]/.test(pw),              label: 'At least one number (0–9)' },
+  { id: 'rule-special', test: pw => /[^A-Za-z0-9]/.test(pw),       label: 'At least one special character (! @ # …)' },
+];
+
+function checkPwRules(pw) {
+  const rulesBox = document.getElementById('pwRules');
+  rulesBox.classList.toggle('show', pw.length > 0);
+  PW_RULES.forEach(r => {
+    const el   = document.getElementById(r.id);
+    const pass = r.test(pw);
+    el.className = 'pw-rule ' + (pass ? 'ok' : (pw.length > 0 ? 'fail' : ''));
+    el.querySelector('i').className = pass ? 'fas fa-check-circle' : 'fas fa-times-circle';
+  });
+}
+
+function pwIsValid(pw) {
+  return PW_RULES.every(r => r.test(pw));
+}
+
+// ── User chips (quick login) ──
+function loadUserChips() {
+  const users = getUsers();
+  const wrap  = document.getElementById('existingUsersList');
+  const chips = document.getElementById('userChips');
+  if (!users.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  chips.innerHTML = users.map(u => `
+    <div class="user-chip" onclick="fillUser('${u.username}')">
+      <span class="user-role-icon">${u.role === 'teacher' ? '👨‍🏫' : '🎓'}</span>
+      ${u.displayName}
+    </div>`).join('');
+}
+function fillUser(username) {
+  document.getElementById('siUsername').value = username;
+  document.getElementById('siPassword').focus();
+}
+
+// ── SIGN IN ──
+function signIn() {
+  clearErrors();
+  const username = document.getElementById('siUsername').value.trim().toLowerCase();
+  const password = document.getElementById('siPassword').value;
+  const remember = document.getElementById('rememberMe').checked;
+  let ok = true;
+
+  if (!username) { setErr('siUsername', 'Username is required'); ok = false; }
+  if (!password) { setErr('siPassword', 'Password is required'); ok = false; }
+  if (!ok) return;
+
+  const user = getUsers().find(u => u.username === username);
+  if (!user)                              { showAlert('signinAlert', 'signinAlertMsg', 'No account found with this username.'); return; }
+  if (user.passwordHash !== hashPw(password)) { showAlert('signinAlert', 'signinAlertMsg', 'Incorrect password. Please try again.'); return; }
+
+  const session = JSON.stringify({ username: user.username, displayName: user.displayName, role: user.role || 'student' });
+  sessionStorage.setItem('ib_session', session);
+  if (remember) localStorage.setItem('ib_remember', session);
+  else          localStorage.removeItem('ib_remember');
+
+  window.location.replace('index.html');
+}
+
+// ── SIGN UP ──
+function signUp() {
+  clearErrors();
+  const name     = document.getElementById('suName').value.trim();
+  const username = document.getElementById('suUsername').value.trim().toLowerCase();
+  const password = document.getElementById('suPassword').value;
+  const confirm  = document.getElementById('suConfirm').value;
+  let ok = true;
+
+  if (!name)                    { setErr('suName',     'Full name is required');                         ok = false; }
+  if (!username)                { setErr('suUsername', 'Username is required');                          ok = false; }
+  else if (username.length < 3) { setErr('suUsername', 'Username must be at least 3 characters');       ok = false; }
+  else if (!/^[a-z0-9_]+$/.test(username)) { setErr('suUsername', 'Only letters, numbers and _ allowed'); ok = false; }
+
+  if (!password) {
+    setErr('suPassword', 'Password is required'); ok = false;
+  } else if (!pwIsValid(password)) {
+    setErr('suPassword', 'Password does not meet all requirements'); ok = false;
+  }
+  if (password && confirm !== password) { setErr('suConfirm', 'Passwords do not match'); ok = false; }
+  if (!ok) return;
+
+  const users = getUsers();
+  if (users.find(u => u.username === username)) { setErr('suUsername', 'This username is already taken'); return; }
+
+  users.push({
+    username,
+    displayName:  name,
+    role:         selectedRole,
+    passwordHash: hashPw(password),
+    createdAt:    new Date().toISOString().split('T')[0]
+  });
+  saveUsers(users);
+
+  showAlert('signupAlertOk', 'signupAlertOkMsg', `✅ Account created! Welcome, ${name}. Signing you in…`);
+
+  setTimeout(() => {
+    const session = JSON.stringify({ username, displayName: name, role: selectedRole });
+    sessionStorage.setItem('ib_session', session);
+    localStorage.setItem('ib_remember', session);
+    window.location.replace('index.html');
+  }, 1200);
+}
+
+// ── Enter key support ──
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  if (document.getElementById('panelSignIn').classList.contains('active')) signIn();
+  else signUp();
+});
+
+// ── Init ──
+loadUserChips();
+</script>
+</body>
+</html>

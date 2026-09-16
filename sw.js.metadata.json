@@ -1,0 +1,4 @@
+{
+  "summary": "Service Worker for offline caching and PWA support. Implements cache-first strategy for all app assets (HTML, CSS, JS, icons) with automatic cache updates on new versions.",
+  "updatedAt": "2026-09-16T11:11:58.766117Z"
+}

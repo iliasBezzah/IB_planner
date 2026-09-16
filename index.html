@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>IB – Student Day Planner</title>
+
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#1565C0"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="IB Student"/>
+  <meta name="description" content="Student day planner — timetable, assignments, notes, study tracking and analytics."/>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="apple-touch-icon" href="icon-192.svg"/>
+
+  <link rel="stylesheet" href="style.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+</head>
+<body>
+
+<!-- ══════════════ AUTH GUARD ══════════════ -->
+<script>
+  (function(){
+    const s = sessionStorage.getItem('ib_session') || localStorage.getItem('ib_remember');
+    if (!s) { window.location.replace('login.html'); }
+    else {
+      try {
+        const u = JSON.parse(s);
+        if (!u || !u.username) window.location.replace('login.html');
+      } catch { window.location.replace('login.html'); }
+    }
+  })();
+</script>
+
+<!-- ══════════════ NOTIFICATION BANNER ══════════════ -->
+<div class="notif-banner hidden" id="notifBanner">
+  <i class="fas fa-bell"></i>
+  <span>Enable notifications to get reminders before your classes and deadlines!</span>
+  <button class="btn-notif-allow" onclick="requestNotifPermission()"><i class="fas fa-check"></i> Allow</button>
+  <button class="btn-notif-dismiss" onclick="dismissNotifBanner()"><i class="fas fa-times"></i></button>
+</div>
+
+<!-- ══════════════ HEADER ══════════════ -->
+<header class="site-header">
+  <div class="logo">
+    <span class="logo-ib">IB</span>
+    <div class="logo-text">
+      <span class="brand-title">Student Planner</span>
+      <span class="brand-sub">Full Day Academic Manager</span>
+    </div>
+  </div>
+
+  <nav class="top-nav">
+    <button class="nav-btn active" data-view="dashboard"><i class="fas fa-th-large"></i><span> My Day</span></button>
+    <button class="nav-btn" data-view="week"><i class="fas fa-calendar-week"></i><span> Week</span></button>
+    <button class="nav-btn" data-view="month"><i class="fas fa-calendar-alt"></i><span> Month</span></button>
+    <button class="nav-btn" data-view="timeline"><i class="fas fa-stream"></i><span> Timeline</span></button>
+    <button class="nav-btn" data-view="tasks"><i class="fas fa-tasks"></i><span> Assignments</span></button>
+    <button class="nav-btn" data-view="notes"><i class="fas fa-sticky-note"></i><span> Notes</span></button>
+    <button class="nav-btn" data-view="contacts"><i class="fas fa-user-graduate"></i><span> People</span></button>
+    <button class="nav-btn" data-view="analytics"><i class="fas fa-chart-bar"></i><span> Analytics</span></button>
+  </nav>
+
+  <div class="header-right">
+    <div class="user-badge" id="userBadge" title="Logged in user">
+      <div class="user-avatar" id="userAvatar"></div>
+      <span class="user-name" id="userName"></span>
+    </div>
+    <div class="clock-box" id="liveClock"></div>
+    <div class="date-box" id="liveDate"></div>
+    <button class="btn-icon install-btn hidden" id="installBtn" title="Install App" onclick="installApp()">
+      <i class="fas fa-download"></i>
+    </button>
+    <button class="btn-icon" title="Recurring Classes" onclick="openModal('recurringModal')"><i class="fas fa-redo"></i></button>
+    <button class="btn-icon" title="Settings" onclick="openModal('settingsModal')"><i class="fas fa-cog"></i></button>
+    <button class="btn-icon" title="Print" onclick="window.print()"><i class="fas fa-print"></i></button>
+    <button class="btn-icon" title="Export" onclick="exportData()"><i class="fas fa-file-download"></i></button>
+    <button class="btn-icon btn-logout" title="Logout" onclick="logout()"><i class="fas fa-sign-out-alt"></i></button>
+  </div>
+</header>
+
+<!-- ══════════════ MAIN VIEWS ══════════════ -->
+<main class="main-content">
+
+  <!-- ─────────── DASHBOARD / MY DAY VIEW ─────────── -->
+  <section class="view active" id="view-dashboard">
+
+    <div class="day-selector-bar">
+      <button class="btn-secondary" onclick="changeDay(-1)"><i class="fas fa-chevron-left"></i></button>
+      <div class="day-display">
+        <input type="date" id="dayPicker" onchange="loadDay()"/>
+        <span id="dayLabel" class="day-label"></span>
+      </div>
+      <button class="btn-secondary" onclick="changeDay(1)"><i class="fas fa-chevron-right"></i></button>
+      <button class="btn-primary" onclick="goToday()"><i class="fas fa-calendar-day"></i> Today</button>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="stats-row">
+      <div class="stat-card" style="--accent:#1565C0">
+        <i class="fas fa-book-open"></i>
+        <div><span class="stat-num" id="stat-hours">0h</span><span class="stat-lbl">Study Hours</span></div>
+      </div>
+      <div class="stat-card" style="--accent:#0288D1">
+        <i class="fas fa-check-double"></i>
+        <div><span class="stat-num" id="stat-done">0</span><span class="stat-lbl">Done</span></div>
+      </div>
+      <div class="stat-card" style="--accent:#0097A7">
+        <i class="fas fa-hourglass-half"></i>
+        <div><span class="stat-num" id="stat-pending">0</span><span class="stat-lbl">To Do</span></div>
+      </div>
+      <div class="stat-card" style="--accent:#C62828">
+        <i class="fas fa-exclamation-circle"></i>
+        <div><span class="stat-num" id="stat-priority">0</span><span class="stat-lbl">Urgent</span></div>
+      </div>
+      <div class="stat-card" style="--accent:#5D4037">
+        <i class="fas fa-coffee"></i>
+        <div><span class="stat-num" id="stat-breaks">0</span><span class="stat-lbl">Breaks</span></div>
+      </div>
+      <div class="stat-card" style="--accent:#283593">
+        <i class="fas fa-graduation-cap"></i>
+        <div><span class="stat-num" id="stat-progress">0%</span><span class="stat-lbl">Day Progress</span></div>
+      </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="day-progress-bar">
+      <div class="dpb-label"><i class="fas fa-graduation-cap"></i> Academic Day Progress</div>
+      <div class="dpb-track"><div class="dpb-fill" id="dayProgressFill"></div></div>
+      <span id="dayProgressPct">0%</span>
+    </div>
+
+    <!-- Dashboard Grid -->
+    <div class="dashboard-grid">
+
+      <!-- Timetable Panel -->
+      <div class="panel panel-schedule">
+        <div class="panel-header">
+          <h2><i class="fas fa-calendar-alt"></i> Timetable</h2>
+          <div class="panel-actions">
+            <select id="filterCategory" onchange="renderSchedule()">
+              <option value="all">All Categories</option>
+              <option value="lecture">Lecture</option>
+              <option value="study">Study</option>
+              <option value="assignment">Assignment</option>
+              <option value="exam">Exam / Test</option>
+              <option value="group">Study Group</option>
+              <option value="library">Library</option>
+              <option value="break">Break</option>
+              <option value="meal">Meal</option>
+              <option value="sport">Sport</option>
+              <option value="social">Social</option>
+              <option value="personal">Personal</option>
+              <option value="travel">Travel</option>
+            </select>
+            <button class="btn-primary" onclick="openAddEventModal()"><i class="fas fa-plus"></i> Add Event</button>
+          </div>
+        </div>
+        <div class="schedule-list" id="scheduleList"></div>
+      </div>
+
+      <!-- Right Column -->
+      <div class="right-col">
+
+        <!-- Quick Add -->
+        <div class="panel panel-quick">
+          <div class="panel-header"><h2><i class="fas fa-plus-circle"></i> Quick Add</h2></div>
+          <div class="quick-form">
+            <input type="text" id="quickTitle" placeholder="e.g. Math Lecture, Study session…"/>
+            <div class="quick-row">
+              <input type="time" id="quickStart" value="08:00"/>
+              <span>→</span>
+              <input type="time" id="quickEnd" value="10:00"/>
+            </div>
+            <select id="quickCat">
+              <option value="lecture">🎓 Lecture</option>
+              <option value="study">📖 Study</option>
+              <option value="assignment">📝 Assignment</option>
+              <option value="exam">📋 Exam / Test</option>
+              <option value="group">🤝 Study Group</option>
+              <option value="library">📚 Library</option>
+              <option value="break">☕ Break</option>
+              <option value="meal">🍽️ Meal</option>
+              <option value="sport">🏃 Sport</option>
+              <option value="social">🎉 Social</option>
+              <option value="personal">🧘 Personal</option>
+              <option value="travel">🚗 Travel</option>
+            </select>
+            <button class="btn-primary full-width" onclick="quickAdd()"><i class="fas fa-bolt"></i> Quick Add</button>
+          </div>
+        </div>
+
+        <!-- Mood & Energy -->
+        <div class="panel panel-mood">
+          <div class="panel-header"><h2><i class="fas fa-smile"></i> Mood &amp; Energy</h2></div>
+          <div class="mood-grid">
+            <div class="mood-section">
+              <label>Morning Mood</label>
+              <div class="emoji-row" id="moodMorningRow">
+                <span class="emoji-opt" data-val="😔" onclick="setMood('moodMorning','😔',this)">😔</span>
+                <span class="emoji-opt" data-val="😐" onclick="setMood('moodMorning','😐',this)">😐</span>
+                <span class="emoji-opt" data-val="🙂" onclick="setMood('moodMorning','🙂',this)">🙂</span>
+                <span class="emoji-opt" data-val="😊" onclick="setMood('moodMorning','😊',this)">😊</span>
+                <span class="emoji-opt" data-val="🤩" onclick="setMood('moodMorning','🤩',this)">🤩</span>
+              </div>
+            </div>
+            <div class="mood-section">
+              <label>Evening Mood</label>
+              <div class="emoji-row" id="moodEveningRow">
+                <span class="emoji-opt" data-val="😔" onclick="setMood('moodEvening','😔',this)">😔</span>
+                <span class="emoji-opt" data-val="😐" onclick="setMood('moodEvening','😐',this)">😐</span>
+                <span class="emoji-opt" data-val="🙂" onclick="setMood('moodEvening','🙂',this)">🙂</span>
+                <span class="emoji-opt" data-val="😊" onclick="setMood('moodEvening','😊',this)">😊</span>
+                <span class="emoji-opt" data-val="🤩" onclick="setMood('moodEvening','🤩',this)">🤩</span>
+              </div>
+            </div>
+            <div class="mood-section full">
+              <label>Focus &amp; Energy Level</label>
+              <input type="range" min="1" max="10" value="5" id="energySlider" oninput="saveEnergy(this.value)" class="energy-slider"/>
+              <div class="energy-labels"><span>Low</span><span id="energyVal">5</span><span>High</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Health Tracker -->
+        <div class="panel panel-health">
+          <div class="panel-header"><h2><i class="fas fa-heartbeat"></i> Daily Tracker</h2></div>
+          <div class="health-grid">
+            <div class="health-item">
+              <i class="fas fa-tint" style="color:#42A5F5"></i>
+              <label>Water (glasses)</label>
+              <div class="counter-row">
+                <button onclick="adjustCounter('water',-1)">−</button>
+                <span id="water-count">0</span>
+                <button onclick="adjustCounter('water',1)">+</button>
+              </div>
+            </div>
+            <div class="health-item">
+              <i class="fas fa-apple-alt" style="color:#66BB6A"></i>
+              <label>Meals</label>
+              <div class="counter-row">
+                <button onclick="adjustCounter('meals',-1)">−</button>
+                <span id="meals-count">0</span>
+                <button onclick="adjustCounter('meals',1)">+</button>
+              </div>
+            </div>
+            <div class="health-item">
+              <i class="fas fa-running" style="color:#FFA726"></i>
+              <label>Sport (min)</label>
+              <div class="counter-row">
+                <button onclick="adjustCounter('exercise',-15)">−</button>
+                <span id="exercise-count">0</span>
+                <button onclick="adjustCounter('exercise',15)">+</button>
+              </div>
+            </div>
+            <div class="health-item">
+              <i class="fas fa-moon" style="color:#AB47BC"></i>
+              <label>Sleep (hrs)</label>
+              <div class="counter-row">
+                <button onclick="adjustCounter('sleep',-0.5)">−</button>
+                <span id="sleep-count">0</span>
+                <button onclick="adjustCounter('sleep',0.5)">+</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /right-col -->
+    </div><!-- /dashboard-grid -->
+
+    <!-- Study Goals -->
+    <div class="panel panel-goals">
+      <div class="panel-header">
+        <h2><i class="fas fa-bullseye"></i> Study Goals for Today</h2>
+        <button class="btn-primary" onclick="addGoal()"><i class="fas fa-plus"></i> Add Goal</button>
+      </div>
+      <div class="goals-list" id="goalsList"></div>
+    </div>
+
+  </section>
+
+  <!-- ─────────── WEEK VIEW ─────────── -->
+  <section class="view" id="view-week">
+    <div class="panel">
+      <div class="panel-header">
+        <h2><i class="fas fa-calendar-week"></i> Weekly Timetable</h2>
+        <div class="panel-actions">
+          <button class="btn-secondary" onclick="changeWeek(-1)"><i class="fas fa-chevron-left"></i></button>
+          <span class="week-label" id="weekLabel"></span>
+          <button class="btn-secondary" onclick="changeWeek(1)"><i class="fas fa-chevron-right"></i></button>
+          <button class="btn-primary" onclick="goCurrentWeek()"><i class="fas fa-calendar-day"></i> This Week</button>
+          <button class="btn-primary" onclick="openAddEventModal()"><i class="fas fa-plus"></i> Add Event</button>
+        </div>
+      </div>
+      <div class="week-grid-wrapper">
+        <div class="week-grid" id="weekGrid"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────── MONTH VIEW ─────────── -->
+  <section class="view" id="view-month">
+    <div class="panel">
+      <div class="panel-header">
+        <h2><i class="fas fa-calendar-alt"></i> Monthly Calendar</h2>
+        <div class="panel-actions">
+          <button class="btn-secondary" onclick="changeMonth(-1)"><i class="fas fa-chevron-left"></i></button>
+          <span class="month-label" id="monthLabel"></span>
+          <button class="btn-secondary" onclick="changeMonth(1)"><i class="fas fa-chevron-right"></i></button>
+          <button class="btn-primary" onclick="goCurrentMonth()"><i class="fas fa-calendar-day"></i> This Month</button>
+          <button class="btn-primary" onclick="openAddEventModal()"><i class="fas fa-plus"></i> Add Event</button>
+        </div>
+      </div>
+      <div class="month-grid" id="monthGrid"></div>
+    </div>
+  </section>
+
+  <!-- ─────────── TIMELINE VIEW ─────────── -->
+  <section class="view" id="view-timeline">
+    <div class="panel">
+      <div class="panel-header">
+        <h2><i class="fas fa-stream"></i> Day Timeline</h2>
+        <button class="btn-primary" onclick="openAddEventModal()"><i class="fas fa-plus"></i> Add Event</button>
+      </div>
+      <div class="timeline-container" id="timelineContainer"></div>
+    </div>
+  </section>
+
+  <!-- ─────────── ASSIGNMENTS VIEW ─────────── -->
+  <section class="view" id="view-tasks">
+    <div class="panel">
+      <div class="panel-header">
+        <h2><i class="fas fa-tasks"></i> Assignments &amp; To-Do</h2>
+        <div class="panel-actions">
+          <select id="taskFilter" onchange="renderTasks()">
+            <option value="all">All</option>
+            <option value="pending">Pending</option>
+            <option value="done">Done</option>
+            <option value="high">Urgent</option>
+          </select>
+          <button class="btn-primary" onclick="openModal('addTaskModal')"><i class="fas fa-plus"></i> Add Assignment</button>
+        </div>
+      </div>
+      <div id="taskList" class="task-list"></div>
+    </div>
+  </section>
+
+  <!-- ─────────── NOTES VIEW ─────────── -->
+  <section class="view" id="view-notes">
+    <div class="panel">
+      <div class="panel-header">
+        <h2><i class="fas fa-sticky-note"></i> Notes &amp; Course Notes</h2>
+        <button class="btn-primary" onclick="addNote()"><i class="fas fa-plus"></i> New Note</button>
+      </div>
+      <div class="notes-grid" id="notesGrid"></div>
+    </div>
+  </section>
+
+  <!-- ─────────── PEOPLE VIEW ─────────── -->
+  <section class="view" id="view-contacts">
+    <div class="panel">
+      <div class="panel-header">
+        <h2><i class="fas fa-user-graduate"></i> Classmates &amp; Professors</h2>
+        <button class="btn-primary" onclick="openModal('addContactModal')"><i class="fas fa-plus"></i> Add Person</button>
+      </div>
+      <div class="contacts-grid" id="contactsGrid"></div>
+    </div>
+  </section>
+
+  <!-- ─────────── ANALYTICS VIEW ─────────── -->
+  <section class="view" id="view-analytics">
+    <div class="panel">
+      <div class="panel-header"><h2><i class="fas fa-chart-bar"></i> Study Analytics</h2></div>
+      <div class="analytics-grid">
+        <div class="chart-box"><h3><i class="fas fa-book"></i> Time by Subject / Category</h3><div class="bar-chart" id="catBarChart"></div></div>
+        <div class="chart-box"><h3><i class="fas fa-clock"></i> Hourly Schedule Load</h3><div class="bar-chart" id="hourBarChart"></div></div>
+        <div class="chart-box"><h3><i class="fas fa-heartbeat"></i> Daily Wellness</h3><div id="healthSummary" class="health-summary-grid"></div></div>
+        <div class="chart-box">
+          <h3><i class="fas fa-graduation-cap"></i> Academic Score</h3>
+          <div class="score-ring-wrap">
+            <div class="score-ring" id="scoreRing"><span id="scoreVal">—</span></div>
+            <p id="scoreLabel">Based on completed tasks &amp; events</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ══════════════ MODALS ══════════════ -->
+
+<!-- Add / Edit Event Modal -->
+<div class="modal-overlay" id="addEventModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3 id="eventModalTitle"><i class="fas fa-calendar-plus"></i> Add to Timetable</h3>
+      <button class="modal-close" onclick="closeModal('addEventModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editEventId"/>
+      <div class="form-row">
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Title * (e.g. "Math 102", "Biology Lab", "Study session")</label>
+          <input type="text" id="evTitle" placeholder="Event title"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Start Time *</label><input type="time" id="evStart"/></div>
+        <div class="form-group"><label>End Time *</label><input type="time" id="evEnd"/></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Category</label>
+          <select id="evCat">
+            <option value="lecture">🎓 Lecture / Class</option>
+            <option value="study">📖 Study (solo)</option>
+            <option value="assignment">📝 Assignment Work</option>
+            <option value="exam">📋 Exam / Test</option>
+            <option value="group">🤝 Study Group</option>
+            <option value="library">📚 Library</option>
+            <option value="break">☕ Break</option>
+            <option value="meal">🍽️ Meal</option>
+            <option value="sport">🏃 Sport / Gym</option>
+            <option value="social">🎉 Social / Campus</option>
+            <option value="personal">🧘 Personal</option>
+            <option value="travel">🚗 Travel / Commute</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Priority</label>
+          <select id="evPriority">
+            <option value="normal">Normal</option>
+            <option value="high">🔴 Urgent</option>
+            <option value="low">🟢 Low</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Room / Location</label><input type="text" id="evLocation" placeholder="e.g. Room 204, Library, Online"/></div>
+        <div class="form-group">
+          <label>Reminder</label>
+          <select id="evReminder">
+            <option value="0">None</option>
+            <option value="5">5 min before</option>
+            <option value="10">10 min before</option>
+            <option value="15" selected>15 min before</option>
+            <option value="30">30 min before</option>
+            <option value="60">1 hour before</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Recurring Section -->
+      <div class="recurring-section">
+        <div class="recurring-header" onclick="toggleRecurringSection()">
+          <i class="fas fa-redo"></i>
+          <span>Recurring / Routine Class</span>
+          <i class="fas fa-chevron-down" id="recurChevron"></i>
+        </div>
+        <div class="recurring-body hidden" id="recurringBody">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Repeat</label>
+              <select id="evRepeat" onchange="onRepeatChange()">
+                <option value="none">No repeat</option>
+                <option value="daily">Every day</option>
+                <option value="weekly">Every week</option>
+                <option value="monthly">Every month</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Starting From</label>
+              <input type="date" id="evStartDate"/>
+            </div>
+          </div>
+          <div class="form-group hidden" id="weekdaysGroup">
+            <label>Repeat on days</label>
+            <div class="weekday-checkboxes">
+              <label class="wday"><input type="checkbox" value="1" class="wday-cb"/> Mon</label>
+              <label class="wday"><input type="checkbox" value="2" class="wday-cb"/> Tue</label>
+              <label class="wday"><input type="checkbox" value="3" class="wday-cb"/> Wed</label>
+              <label class="wday"><input type="checkbox" value="4" class="wday-cb"/> Thu</label>
+              <label class="wday"><input type="checkbox" value="5" class="wday-cb"/> Fri</label>
+              <label class="wday"><input type="checkbox" value="6" class="wday-cb"/> Sat</label>
+              <label class="wday"><input type="checkbox" value="0" class="wday-cb"/> Sun</label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Repeat Until (Semester End Date)</label>
+            <input type="date" id="evRepeatUntil"/>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group"><label>Notes / Course Info</label><textarea id="evNotes" placeholder="e.g. Professor name, chapter, bring calculator…" rows="2"></textarea></div>
+      <div class="form-group">
+        <label>Color Tag</label>
+        <div class="color-picker" id="evColor">
+          <span class="color-dot selected" style="background:#1565C0" data-color="#1565C0" onclick="pickColor(this)"></span>
+          <span class="color-dot" style="background:#1A237E" data-color="#1A237E" onclick="pickColor(this)"></span>
+          <span class="color-dot" style="background:#6A1B9A" data-color="#6A1B9A" onclick="pickColor(this)"></span>
+          <span class="color-dot" style="background:#C62828" data-color="#C62828" onclick="pickColor(this)"></span>
+          <span class="color-dot" style="background:#00838F" data-color="#00838F" onclick="pickColor(this)"></span>
+          <span class="color-dot" style="background:#2E7D32" data-color="#2E7D32" onclick="pickColor(this)"></span>
+          <span class="color-dot" style="background:#E65100" data-color="#E65100" onclick="pickColor(this)"></span>
+          <span class="color-dot" style="background:#37474F" data-color="#37474F" onclick="pickColor(this)"></span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('addEventModal')">Cancel</button>
+      <button class="btn-primary" onclick="saveEvent()"><i class="fas fa-save"></i> Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Assignment Modal -->
+<div class="modal-overlay" id="addTaskModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3><i class="fas fa-tasks"></i> Add Assignment / Task</h3>
+      <button class="modal-close" onclick="closeModal('addTaskModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editTaskId"/>
+      <div class="form-group">
+        <label>Assignment Title *</label>
+        <input type="text" id="taskTitle" placeholder="e.g. Write essay — History Ch.4"/>
+      </div>
+      <div class="form-group">
+        <label>Subject / Category</label>
+        <select id="taskCat">
+          <option value="lecture">🎓 Lecture</option>
+          <option value="study">📖 Study</option>
+          <option value="assignment">📝 Assignment</option>
+          <option value="exam">📋 Exam Prep</option>
+          <option value="group">🤝 Group Work</option>
+          <option value="library">📚 Library</option>
+          <option value="personal">🧘 Personal</option>
+          <option value="sport">🏃 Sport</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Priority</label>
+          <select id="taskPriority">
+            <option value="normal">Normal</option>
+            <option value="high">🔴 Urgent</option>
+            <option value="low">🟢 Low</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Due Time</label><input type="time" id="taskDue"/></div>
+      </div>
+      <div class="form-group"><label>Estimated Time (min)</label><input type="number" id="taskDuration" placeholder="e.g. 60" min="5"/></div>
+      <div class="form-group"><label>Subject Tags (comma separated)</label><input type="text" id="taskTags" placeholder="e.g. math, homework, chapter5"/></div>
+      <div class="form-group"><label>Notes</label><textarea id="taskNotes" placeholder="Details, references, page numbers…" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('addTaskModal')">Cancel</button>
+      <button class="btn-primary" onclick="saveTask()"><i class="fas fa-save"></i> Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Person Modal -->
+<div class="modal-overlay" id="addContactModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3><i class="fas fa-user-plus"></i> Add Classmate / Professor</h3>
+      <button class="modal-close" onclick="closeModal('addContactModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label>First Name *</label><input type="text" id="contactFirst" placeholder="First name"/></div>
+        <div class="form-group"><label>Last Name</label><input type="text" id="contactLast" placeholder="Last name"/></div>
+      </div>
+      <div class="form-group">
+        <label>Role</label>
+        <select id="contactRole">
+          <option value="Classmate">🎓 Classmate</option>
+          <option value="Professor">👨‍🏫 Professor</option>
+          <option value="Tutor">📖 Tutor</option>
+          <option value="Study Partner">🤝 Study Partner</option>
+          <option value="Teaching Assistant">📋 Teaching Assistant</option>
+          <option value="Lab Partner">🔬 Lab Partner</option>
+          <option value="Friend">😊 Friend</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Department / Course</label><input type="text" id="contactOrg" placeholder="e.g. Physics Dept, Math 101"/></div>
+      <div class="form-group"><label>Email</label><input type="email" id="contactEmail" placeholder="email@university.edu"/></div>
+      <div class="form-group"><label>Phone / WhatsApp</label><input type="tel" id="contactPhone" placeholder="+1 234 567 890"/></div>
+      <div class="form-group"><label>Notes</label><textarea id="contactNotes" rows="2" placeholder="Office hours, group project notes…"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('addContactModal')">Cancel</button>
+      <button class="btn-primary" onclick="saveContact()"><i class="fas fa-save"></i> Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Recurring Classes Manager -->
+<div class="modal-overlay" id="recurringModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3><i class="fas fa-redo"></i> Recurring Classes &amp; Routines</h3>
+      <button class="modal-close" onclick="closeModal('recurringModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-light);margin-bottom:12px">Your weekly classes and routines. Add via <b>Add Event → Recurring / Routine Class</b>.</p>
+      <div id="recurringList"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('recurringModal')">Close</button>
+      <button class="btn-primary" onclick="closeModal('recurringModal');openAddEventModal()"><i class="fas fa-plus"></i> Add Recurring Class</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3><i class="fas fa-cog"></i> Settings</h3>
+      <button class="modal-close" onclick="closeModal('settingsModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label>Your Name</label><input type="text" id="settingName" placeholder="e.g. Alex"/></div>
+      <div class="form-group"><label>Class Hours Start</label><input type="time" id="settingWorkStart" value="08:00"/></div>
+      <div class="form-group"><label>Class Hours End</label><input type="time" id="settingWorkEnd" value="18:00"/></div>
+      <div class="form-group">
+        <label>Theme</label>
+        <select id="settingTheme" onchange="applyTheme(this.value)">
+          <option value="blue">Classic Blue</option>
+          <option value="dark">Dark Blue</option>
+          <option value="light">Light Blue</option>
+        </select>
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:10px">
+        <label style="margin:0">Enable Notifications</label>
+        <input type="checkbox" id="settingReminders" checked style="width:18px;height:18px"/>
+      </div>
+      <div class="form-group">
+        <button class="btn-secondary full-width" onclick="requestNotifPermission()">
+          <i class="fas fa-bell"></i> Request Notification Permission
+        </button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('settingsModal')">Cancel</button>
+      <button class="btn-primary" onclick="saveSettings()"><i class="fas fa-save"></i> Save Settings</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Reminder Bell -->
+<div class="reminder-bell hidden" id="reminderBell" onclick="dismissReminder()">
+  <i class="fas fa-bell"></i>
+  <span id="reminderText"></span>
+  <small>Click to dismiss</small>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

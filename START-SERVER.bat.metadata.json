@@ -1,0 +1,4 @@
+{
+  "summary": "Windows batch file that automatically starts a local HTTP server for the IB Planner app. Tries Python first (python -m http.server), then Node.js http-server as fallback. Auto-opens Chrome/Edge at localhost:8080 after 2 seconds. Displays clear instructions.",
+  "updatedAt": "2026-09-16T22:34:53.038692200Z"
+}

@@ -1,0 +1,4 @@
+{
+  "summary": "Student-focused app.js. Replaces work/meeting/admin/learning categories with lecture/study/assignment/exam/group/library/sport/social/personal/travel/break/meal. Updates CAT_ICONS and CAT_COLORS for academic context. Demo data shows a realistic student day: morning lectures, library study, group session, sport, meal, evening study. Recurring demo: Cours every Monday 08:00-11:00 until Jan 14 2027. Contacts: professor, classmates, tutor. Goals: study goals. All other functionality (week/month/timeline/tasks/notes/health/analytics/notifications/PWA) preserved.",
+  "updatedAt": "2026-09-16T11:33:49.518592300Z"
+}
