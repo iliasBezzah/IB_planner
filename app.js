@@ -971,12 +971,34 @@ function dismissReminder(){document.getElementById('reminderBell').classList.add
 // PWA
 // ══════════════════════════════════════════
 function initPWA(){
-  if('serviceWorker'in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
-  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;const btn=document.getElementById('installBtn');if(btn)btn.classList.remove('hidden');});
-  window.addEventListener('appinstalled',()=>{const btn=document.getElementById('installBtn');if(btn)btn.classList.add('hidden');deferredInstall=null;showToast('📱 App installed!',4000);});
+  if('serviceWorker'in navigator) {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      reg.update();
+    }).catch(()=>{});
+    if ('caches' in window) {
+      caches.keys().then(keys => {
+        keys.forEach(k => { if (k !== 'ib-planner-v5') caches.delete(k); });
+      });
+    }
+  }
+  window.addEventListener('beforeinstallprompt',e=>{
+    e.preventDefault();
+    deferredInstall=e;
+    const btn=document.getElementById('settingInstallBtn');
+    if(btn){
+      btn.innerHTML = '<i class="fas fa-download"></i> Install App on this Device';
+    }
+  });
+  window.addEventListener('appinstalled',()=>{
+    deferredInstall=null;
+    showToast('📱 App installed successfully!',4000);
+  });
 }
 function installApp(){
-  if(!deferredInstall){showToast('ℹ️ Open in Chrome/Edge and click the install icon in the address bar.',4000);return;}
+  if(!deferredInstall){
+    showToast('ℹ️ To install: On Chrome/Edge click the install icon in the address bar, or on iPhone tap Share → Add to Home Screen.', 5000);
+    return;
+  }
   deferredInstall.prompt();
   deferredInstall.userChoice.then(()=>{deferredInstall=null;});
 }
