@@ -14,7 +14,7 @@
   <link rel="manifest" href="manifest.json"/>
   <link rel="apple-touch-icon" href="icon-192.svg"/>
 
-  <link rel="stylesheet" href="style.css"/>
+  <link rel="stylesheet" href="style.css?v=5"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
 </head>
 <body>
@@ -63,20 +63,41 @@
   </nav>
 
   <div class="header-right">
-    <div class="user-badge" id="userBadge" title="Logged in user">
-      <div class="user-avatar" id="userAvatar"></div>
-      <span class="user-name" id="userName"></span>
-    </div>
     <div class="clock-box" id="liveClock"></div>
-    <div class="date-box" id="liveDate"></div>
-    <button class="btn-icon install-btn hidden" id="installBtn" title="Install App" onclick="installApp()">
-      <i class="fas fa-download"></i>
-    </button>
-    <button class="btn-icon" title="Recurring Classes" onclick="openModal('recurringModal')"><i class="fas fa-redo"></i></button>
-    <button class="btn-icon" title="Settings" onclick="openModal('settingsModal')"><i class="fas fa-cog"></i></button>
-    <button class="btn-icon" title="Print" onclick="window.print()"><i class="fas fa-print"></i></button>
-    <button class="btn-icon" title="Export" onclick="exportData()"><i class="fas fa-file-download"></i></button>
-    <button class="btn-icon btn-logout" title="Logout" onclick="logout()"><i class="fas fa-sign-out-alt"></i></button>
+
+    <!-- User Profile Dropdown Button -->
+    <div class="user-menu-container" id="userMenuContainer">
+      <button class="user-badge-btn" id="userBadgeBtn" onclick="toggleUserDropdown(event)" title="Account Menu">
+        <div class="user-avatar" id="userAvatar"></div>
+        <span class="user-name" id="userName"></span>
+        <i class="fas fa-chevron-down user-chevron"></i>
+      </button>
+
+      <!-- Dropdown Window containing all actions -->
+      <div class="user-dropdown-menu" id="userDropdown">
+        <div class="ud-header">
+          <div class="ud-avatar" id="udAvatar"></div>
+          <div class="ud-info">
+            <div class="ud-name" id="udName"></div>
+            <div class="ud-role" id="udRole"><i class="fas fa-user-graduate"></i> Student</div>
+          </div>
+        </div>
+        <div class="ud-divider"></div>
+        <button class="ud-item" onclick="openModal('settingsModal'); closeUserDropdown();">
+          <i class="fas fa-cog"></i> <span>Settings</span>
+        </button>
+        <button class="ud-item" onclick="openModal('recurringModal'); closeUserDropdown();">
+          <i class="fas fa-redo"></i> <span>Routine Classes</span>
+        </button>
+        <button class="ud-item" onclick="window.print(); closeUserDropdown();">
+          <i class="fas fa-print"></i> <span>Print Timetable</span>
+        </button>
+        <div class="ud-divider"></div>
+        <button class="ud-item ud-logout" onclick="logout()">
+          <i class="fas fa-sign-out-alt"></i> <span>Sign Out</span>
+        </button>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -642,9 +663,20 @@
         <input type="checkbox" id="settingReminders" checked style="width:18px;height:18px"/>
       </div>
       <div class="form-group">
-        <button class="btn-secondary full-width" onclick="requestNotifPermission()">
+        <button type="button" class="btn-secondary full-width" onclick="requestNotifPermission()">
           <i class="fas fa-bell"></i> Request Notification Permission
         </button>
+      </div>
+
+      <!-- Install App Inside Settings -->
+      <div class="form-group" style="border-top: 1px solid var(--border); padding-top: 14px; margin-top: 14px;">
+        <label>Application Installation</label>
+        <button type="button" class="btn-primary full-width" id="settingInstallBtn" onclick="installApp()">
+          <i class="fas fa-download"></i> Install App on this Device
+        </button>
+        <small style="display:block; color:var(--text-light); font-size:11px; margin-top:5px;">
+          Installs IB Planner as a standalone app on your smartphone, tablet, or laptop.
+        </small>
       </div>
     </div>
     <div class="modal-footer">
@@ -668,7 +700,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js"></script>
-<script src="app.js"></script>
+<script src="firebase-config.js?v=5"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>

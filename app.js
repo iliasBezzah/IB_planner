@@ -1037,18 +1037,49 @@ function showToast(msg,dur=2800){
 }
 
 // ══════════════════════════════════════════
-// USER BADGE & LOGOUT
+// USER BADGE & DROPDOWN MENU
 // ══════════════════════════════════════════
 function initUserBadge() {
   const user = CURRENT_USER;
   if (!user) return;
+  const initial = (user.displayName || 'U').charAt(0).toUpperCase();
+  const name    = user.displayName || user.username || 'User';
+  const role    = (user.role === 'teacher') ? 'Teacher / Dr.' : 'Student';
+  const roleIcon= (user.role === 'teacher') ? 'fa-chalkboard-teacher' : 'fa-user-graduate';
+
   const avatarEl = document.getElementById('userAvatar');
   const nameEl   = document.getElementById('userName');
-  if (avatarEl) avatarEl.textContent = user.displayName.charAt(0).toUpperCase();
-  if (nameEl)   nameEl.textContent   = user.displayName;
+  const udAvatar = document.getElementById('udAvatar');
+  const udName   = document.getElementById('udName');
+  const udRole   = document.getElementById('udRole');
+
+  if (avatarEl) avatarEl.textContent = initial;
+  if (nameEl)   nameEl.textContent   = name;
+  if (udAvatar) udAvatar.textContent = initial;
+  if (udName)   udName.textContent   = name;
+  if (udRole)   udRole.innerHTML     = `<i class="fas ${roleIcon}"></i> ${role}`;
 }
 
+function toggleUserDropdown(e) {
+  if (e) e.stopPropagation();
+  const container = document.getElementById('userMenuContainer');
+  if (container) container.classList.toggle('open');
+}
+
+function closeUserDropdown() {
+  const container = document.getElementById('userMenuContainer');
+  if (container) container.classList.remove('open');
+}
+
+document.addEventListener('click', (e) => {
+  const container = document.getElementById('userMenuContainer');
+  if (container && !container.contains(e.target)) {
+    container.classList.remove('open');
+  }
+});
+
 function logout() {
+  closeUserDropdown();
   if (!confirm('Sign out of IB Student Planner?')) return;
   if (typeof firebase !== 'undefined' && firebase.apps.length) {
     firebase.auth().signOut().catch(() => {});

@@ -119,17 +119,170 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
 .header-right{display:flex;align-items:center;gap:10px;flex-shrink:0;}
 .clock-box{font-size:20px;font-weight:700;letter-spacing:1px;min-width:70px;}
 .date-box{font-size:10px;opacity:.8;white-space:nowrap;}
-.btn-icon{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:14px;transition:all var(--transition);display:flex;align-items:center;justify-content:center;}
-.btn-icon:hover{background:rgba(255,255,255,.3);transform:scale(1.08);}
-.install-btn{background:rgba(255,200,0,.3) !important;border-color:rgba(255,200,0,.6) !important;animation:installPulse 2s ease-in-out infinite;}
-@keyframes installPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,200,0,.4);}50%{box-shadow:0 0 0 6px rgba(255,200,0,0);}}
+/* ─── User Menu & Dropdown Window ─── */
+.user-menu-container {
+  position: relative;
+  display: inline-block;
+}
 
-/* User badge */
-.user-badge{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:20px;padding:5px 12px 5px 5px;cursor:default;}
-.user-avatar{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.9);color:var(--primary);font-size:13px;font-weight:900;display:flex;align-items:center;justify-content:center;}
-.user-name{font-size:12px;font-weight:600;color:#fff;white-space:nowrap;max-width:100px;overflow:hidden;text-overflow:ellipsis;}
-.btn-logout{background:rgba(198,40,40,.3) !important;border-color:rgba(255,100,100,.5) !important;}
-.btn-logout:hover{background:rgba(198,40,40,.6) !important;}
+.user-badge-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  border-radius: 24px;
+  padding: 5px 12px 5px 6px;
+  cursor: pointer;
+  color: #fff;
+  transition: all var(--transition);
+  font-family: inherit;
+}
+.user-badge-btn:hover {
+  background: rgba(255, 255, 255, 0.28);
+  border-color: rgba(255, 255, 255, 0.6);
+  transform: translateY(-1px);
+}
+
+.user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+.user-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-chevron {
+  font-size: 10px;
+  opacity: 0.85;
+  transition: transform 0.2s ease;
+}
+.user-menu-container.open .user-chevron {
+  transform: rotate(180deg);
+}
+
+/* Dropdown Window */
+.user-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px var(--shadow-lg);
+  width: 220px;
+  z-index: 2000;
+  padding: 8px;
+  display: none;
+  animation: dropFade 0.2s ease-out;
+}
+.user-menu-container.open .user-dropdown-menu {
+  display: block;
+}
+
+@keyframes dropFade {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ud-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px 10px;
+}
+.ud-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ud-info {
+  flex: 1;
+  min-width: 0;
+}
+.ud-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ud-role {
+  font-size: 11px;
+  color: var(--primary);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ud-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 6px 0;
+}
+
+.ud-item {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  transition: all var(--transition);
+  font-family: inherit;
+}
+.ud-item:hover {
+  background: var(--surface2);
+  color: var(--primary);
+}
+.ud-item i {
+  font-size: 14px;
+  width: 18px;
+  text-align: center;
+  color: var(--primary);
+}
+.ud-logout {
+  color: var(--danger);
+}
+.ud-logout i {
+  color: var(--danger);
+}
+.ud-logout:hover {
+  background: #FFEBEE;
+  color: var(--danger);
+}
 
 
 /* ════════════════════════════════════════
@@ -534,18 +687,18 @@ textarea{resize:vertical;}
   .brand-sub{display:none;}
 
   .header-right{
-    margin-left:auto;gap:5px;flex-shrink:1;min-width:0;align-items:center;
+    margin-left:auto;gap:8px;flex-shrink:0;align-items:center;display:flex;
   }
-  .user-badge{
-    padding:3px 8px 3px 4px;gap:5px;max-width:115px;
+  .user-badge-btn{
+    padding:3px 8px 3px 4px;gap:5px;
   }
-  .user-avatar{width:22px;height:22px;font-size:11px;}
-  .user-name{max-width:70px;font-size:11px;}
+  .user-avatar{width:24px;height:24px;font-size:11px;}
+  .user-name{max-width:90px;font-size:11px;}
   .clock-box{font-size:14px;min-width:44px;font-weight:700;}
   .date-box{display:none;}
-  .header-right .btn-icon[title="Print"],
-  .header-right .btn-icon[title="Export"]{display:none;}
-  .btn-icon{width:30px;height:30px;font-size:12px;}
+  .user-dropdown-menu{
+    width:205px;right:0;top:calc(100% + 6px);
+  }
 
   .top-nav{
     order:3;width:100%;display:flex;gap:6px;overflow-x:auto;
