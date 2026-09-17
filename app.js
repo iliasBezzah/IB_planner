@@ -356,12 +356,7 @@ function refreshAll() {
   renderGoals();
 }
 function updateDayLabel() {
-  const today = todayStr();
-  let label   = formatDateLong(currentDate);
-  if (currentDate===today)              label='📅 Today — '+label;
-  else if (currentDate===offset(today,-1)) label='⬅️ Yesterday — '+label;
-  else if (currentDate===offset(today,1))  label='➡️ Tomorrow — '+label;
-  document.getElementById('dayLabel').textContent = label;
+  document.getElementById('dayLabel').textContent = formatDateLong(currentDate);
 }
 
 // ══════════════════════════════════════════
