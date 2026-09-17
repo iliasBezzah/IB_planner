@@ -269,10 +269,14 @@ function renderRecurringList() {
           <div class="recurring-item-title">${CAT_ICONS[r.cat]||'📌'} ${esc(r.title)}</div>
           <div class="recurring-item-meta">${r.start}–${r.end} &nbsp;|&nbsp; ${rule}${until}</div>
           ${r.location?`<div class="recurring-item-meta"><i class="fas fa-map-marker-alt"></i> ${esc(r.location)}</div>`:''}
+        <div class="recurring-item-actions">
+          <button class="recurring-item-edit" title="Edit Routine Class" onclick="editRecurringClass('${r.id}')">
+            <i class="fas fa-edit"></i>
+          </button>
+          <button class="recurring-item-del" title="Delete" onclick="deleteRecurring('${r.id}');renderRecurringList();refreshAll();showToast('🗑️ Removed.');">
+            <i class="fas fa-trash"></i>
+          </button>
         </div>
-        <button class="recurring-item-del" onclick="deleteRecurring('${r.id}');renderRecurringList();showToast('🗑️ Removed.');">
-          <i class="fas fa-trash"></i>
-        </button>
       </div>`;
   }).join('');
 }
@@ -296,10 +300,14 @@ function onRepeatChange() {
 function startClock() {
   function tick() {
     const n = new Date();
-    document.getElementById('liveClock').textContent =
-      n.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-    document.getElementById('liveDate').textContent =
-      n.toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+    const clockEl = document.getElementById('liveClock');
+    if (clockEl) {
+      clockEl.textContent = n.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    }
+    const dateEl = document.getElementById('liveDate');
+    if (dateEl) {
+      dateEl.textContent = n.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+    }
   }
   tick();
   setInterval(tick, 1000);
@@ -311,22 +319,30 @@ function startClock() {
 // NAVIGATION
 // ══════════════════════════════════════════
 function initNav() {
-  document.querySelectorAll('.nav-btn').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-      const view = btn.dataset.view;
-      document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-      document.getElementById('view-'+view).classList.add('active');
-      if (view==='timeline')  renderTimeline();
-      if (view==='week')      renderWeek();
-      if (view==='month')     renderMonth();
-      if (view==='tasks')     renderTasks();
-      if (view==='notes')     renderNotes();
-      if (view==='contacts')  renderContacts();
-      if (view==='analytics') renderAnalytics();
-    });
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.onclick = () => {
+      switchView(btn.dataset.view);
+    };
   });
+}
+
+function switchView(v) {
+  if (!v) return;
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.view === v);
+  });
+  document.querySelectorAll('.view').forEach(s => {
+    s.classList.toggle('active', s.id === 'view-' + v);
+  });
+
+  if (v === 'dashboard')  { refreshAll(); }
+  else if (v === 'week')  { renderWeek(); }
+  else if (v === 'month') { renderMonth(); }
+  else if (v === 'timeline') { renderTimeline(); }
+  else if (v === 'tasks') { renderTasks(); }
+  else if (v === 'notes') { renderNotes(); }
+  else if (v === 'contacts') { renderContacts(); }
+  else if (v === 'analytics') { renderAnalytics(); }
 }
 
 // ══════════════════════════════════════════
@@ -372,23 +388,25 @@ function pickColor(el) {
 // EVENTS
 // ══════════════════════════════════════════
 function openAddEventModal(dateForNew) {
-  document.getElementById('editEventId').value  = '';
+  document.getElementById('editEventId').value = '';
+  const recurInput = document.getElementById('editRecurId');
+  if (recurInput) recurInput.value = '';
   document.getElementById('eventModalTitle').innerHTML = '<i class="fas fa-calendar-plus"></i> Add to Timetable';
-  document.getElementById('evTitle').value      = '';
-  document.getElementById('evStart').value      = '';
-  document.getElementById('evEnd').value        = '';
-  document.getElementById('evCat').value        = 'lecture';
-  document.getElementById('evLocation').value   = '';
-  document.getElementById('evPriority').value   = 'normal';
-  document.getElementById('evReminder').value   = '15';
-  document.getElementById('evNotes').value      = '';
-  document.getElementById('evRepeat').value     = 'none';
-  document.getElementById('evStartDate').value  = dateForNew||currentDate;
-  document.getElementById('evRepeatUntil').value= '';
-  document.querySelectorAll('.wday-cb').forEach(cb=>cb.checked=false);
+  document.getElementById('evTitle').value       = '';
+  document.getElementById('evStart').value       = '';
+  document.getElementById('evEnd').value         = '';
+  document.getElementById('evCat').value         = 'lecture';
+  document.getElementById('evLocation').value    = '';
+  document.getElementById('evPriority').value    = 'normal';
+  document.getElementById('evReminder').value    = '15';
+  document.getElementById('evNotes').value       = '';
+  document.getElementById('evRepeat').value      = 'none';
+  document.getElementById('evStartDate').value   = dateForNew || currentDate;
+  document.getElementById('evRepeatUntil').value = '';
+  document.querySelectorAll('.wday-cb').forEach(cb => cb.checked = false);
   document.getElementById('weekdaysGroup').classList.add('hidden');
   selectedColor = '#1565C0';
-  document.querySelectorAll('#evColor .color-dot').forEach((d,i)=>d.classList.toggle('selected',i===0));
+  document.querySelectorAll('#evColor .color-dot').forEach((d,i) => d.classList.toggle('selected', i === 0));
   const body = document.getElementById('recurringBody');
   body.classList.add('hidden');
   body.previousElementSibling.classList.remove('open');
@@ -399,87 +417,182 @@ function saveEvent() {
   const title = document.getElementById('evTitle').value.trim();
   const start = document.getElementById('evStart').value;
   const end   = document.getElementById('evEnd').value;
-  if (!title||!start||!end) { showToast('⚠️ Title, start and end time are required.'); return; }
-  if (start>=end)            { showToast('⚠️ End time must be after start time.'); return; }
+  if (!title || !start || !end) { showToast('⚠️ Title, start and end time are required.'); return; }
+  if (start >= end)             { showToast('⚠️ End time must be after start time.'); return; }
+
+  const editId      = document.getElementById('editEventId').value;
+  const recurInput  = document.getElementById('editRecurId');
+  const editRecurId = recurInput ? recurInput.value : '';
 
   const repeat    = document.getElementById('evRepeat').value;
-  const startDate = document.getElementById('evStartDate').value||currentDate;
+  const startDate = document.getElementById('evStartDate').value || currentDate;
   const endDate   = document.getElementById('evRepeatUntil').value;
+  const cat       = document.getElementById('evCat').value;
+  const location  = document.getElementById('evLocation').value.trim();
+  const priority  = document.getElementById('evPriority').value;
+  const reminder  = parseInt(document.getElementById('evReminder').value) || 0;
+  const notes     = document.getElementById('evNotes').value.trim();
 
-  if (repeat && repeat!=='none') {
-    const days=[];
-    document.querySelectorAll('.wday-cb:checked').forEach(cb=>days.push(parseInt(cb.value)));
-    if (repeat==='weekly'&&days.length===0) { showToast('⚠️ Select at least one day.'); return; }
+  // If recurring (daily, weekly, monthly)
+  if (repeat && repeat !== 'none') {
+    const days = [];
+    document.querySelectorAll('.wday-cb:checked').forEach(cb => days.push(parseInt(cb.value)));
+    if (repeat === 'weekly' && days.length === 0) {
+      showToast('⚠️ Please select at least one day.');
+      return;
+    }
     const rec = {
-      id:uid(), title, start, end,
-      cat:      document.getElementById('evCat').value,
-      location: document.getElementById('evLocation').value.trim(),
-      priority: document.getElementById('evPriority').value,
-      reminder: parseInt(document.getElementById('evReminder').value)||0,
-      notes:    document.getElementById('evNotes').value.trim(),
-      color:    selectedColor,
-      freq:repeat, days, startDate, endDate:endDate||null
+      id: editRecurId || uid(),
+      title, start, end, cat, location, priority, reminder, notes,
+      color: selectedColor,
+      freq: repeat, days, startDate, endDate: endDate || null
     };
+
     saveRecurring(rec);
+
+    // If it was previously a single event, remove it
+    if (editId) {
+      const data = dayData(currentDate);
+      data.events = data.events.filter(e => e.id !== editId);
+      save();
+    }
+
     closeModal('addEventModal');
     refreshAll();
     if (document.getElementById('view-week').classList.contains('active'))  renderWeek();
     if (document.getElementById('view-month').classList.contains('active')) renderMonth();
-    showToast('🔁 Recurring class saved!');
+    showToast(editRecurId ? '🔁 Routine class updated!' : '🔁 Routine class saved!');
     return;
   }
 
-  const editId = document.getElementById('editEventId').value;
-  const data   = dayData(currentDate);
+  // If it was a recurring class and user turned repeat to "none"
+  if (editRecurId && (!repeat || repeat === 'none')) {
+    deleteRecurring(editRecurId);
+  }
+
+  // Single day event save / update
+  const data = dayData(currentDate);
   const ev = {
-    id:editId||uid(), title, start, end,
-    cat:      document.getElementById('evCat').value,
-    location: document.getElementById('evLocation').value.trim(),
-    priority: document.getElementById('evPriority').value,
-    reminder: parseInt(document.getElementById('evReminder').value)||0,
-    notes:    document.getElementById('evNotes').value.trim(),
-    color:    selectedColor, done:false, reminded:false
+    id: editId || uid(),
+    title, start, end, cat, location, priority, reminder, notes,
+    color: selectedColor, done: false, reminded: false
   };
+
   if (editId) {
-    const idx=data.events.findIndex(e=>e.id===editId);
-    if (idx>=0){ev.done=data.events[idx].done;data.events[idx]=ev;}
-  } else { data.events.push(ev); }
-  data.events.sort((a,b)=>a.start.localeCompare(b.start));
+    const idx = data.events.findIndex(e => e.id === editId);
+    if (idx >= 0) { ev.done = data.events[idx].done; data.events[idx] = ev; }
+    else { data.events.push(ev); }
+  } else {
+    data.events.push(ev);
+  }
+
+  data.events.sort((a, b) => a.start.localeCompare(b.start));
   save();
   closeModal('addEventModal');
-  renderSchedule(); renderStats();
+  renderSchedule();
+  renderStats();
   if (document.getElementById('view-week').classList.contains('active'))  renderWeek();
   if (document.getElementById('view-month').classList.contains('active')) renderMonth();
-  showToast(editId?'✏️ Updated!':'✅ Added to timetable!');
+  showToast(editId ? '✏️ Class updated!' : '✅ Added to timetable!');
 }
 
 function editEvent(id) {
-  if (id.includes('_')) { showToast('✏️ Edit via Recurring Classes manager.'); openModal('recurringModal'); renderRecurringList(); return; }
-  const ev=dayData(currentDate).events.find(e=>e.id===id);
+  if (!id) return;
+  const recurInput = document.getElementById('editRecurId');
+
+  // If this is an instance of a recurring class (e.g. "rec123_2026-09-18")
+  if (id.includes('_')) {
+    const recurId = id.split('_')[0];
+    editRecurringClass(recurId);
+    return;
+  }
+
+  const ev = dayData(currentDate).events.find(e => e.id === id);
   if (!ev) return;
-  document.getElementById('editEventId').value  = ev.id;
-  document.getElementById('eventModalTitle').innerHTML='<i class="fas fa-edit"></i> Edit Event';
+
+  document.getElementById('editEventId').value = ev.id;
+  if (recurInput) recurInput.value = '';
+  document.getElementById('eventModalTitle').innerHTML = '<i class="fas fa-edit"></i> Edit Event';
   document.getElementById('evTitle').value      = ev.title;
   document.getElementById('evStart').value      = ev.start;
   document.getElementById('evEnd').value        = ev.end;
   document.getElementById('evCat').value        = ev.cat;
-  document.getElementById('evLocation').value   = ev.location||'';
+  document.getElementById('evLocation').value   = ev.location || '';
   document.getElementById('evPriority').value   = ev.priority;
-  document.getElementById('evReminder').value   = ev.reminder||'15';
-  document.getElementById('evNotes').value      = ev.notes||'';
+  document.getElementById('evReminder').value   = ev.reminder || '15';
+  document.getElementById('evNotes').value      = ev.notes || '';
   document.getElementById('evRepeat').value     = 'none';
   document.getElementById('weekdaysGroup').classList.add('hidden');
-  selectedColor = ev.color||'#1565C0';
-  document.querySelectorAll('#evColor .color-dot').forEach(d=>
-    d.classList.toggle('selected',d.dataset.color===selectedColor));
+  const body = document.getElementById('recurringBody');
+  body.classList.add('hidden');
+  body.previousElementSibling.classList.remove('open');
+
+  selectedColor = ev.color || '#1565C0';
+  document.querySelectorAll('#evColor .color-dot').forEach(d =>
+    d.classList.toggle('selected', d.dataset.color === selectedColor));
+
+  openModal('addEventModal');
+}
+
+function editRecurringClass(recurId) {
+  const r = (globalData.recurring || []).find(item => item.id === recurId);
+  if (!r) {
+    showToast('⚠️ Routine class not found.');
+    return;
+  }
+  closeModal('recurringModal');
+
+  document.getElementById('editEventId').value = '';
+  const recurInput = document.getElementById('editRecurId');
+  if (recurInput) recurInput.value = r.id;
+
+  document.getElementById('eventModalTitle').innerHTML = '<i class="fas fa-edit"></i> Edit Routine Class';
+  document.getElementById('evTitle').value      = r.title;
+  document.getElementById('evStart').value      = r.start;
+  document.getElementById('evEnd').value        = r.end;
+  document.getElementById('evCat').value        = r.cat || 'lecture';
+  document.getElementById('evLocation').value   = r.location || '';
+  document.getElementById('evPriority').value   = r.priority || 'normal';
+  document.getElementById('evReminder').value   = r.reminder || '15';
+  document.getElementById('evNotes').value      = r.notes || '';
+
+  // Expand recurring section and pre-fill
+  document.getElementById('evRepeat').value     = r.freq || 'weekly';
+  const body = document.getElementById('recurringBody');
+  body.classList.remove('hidden');
+  body.previousElementSibling.classList.add('open');
+
+  document.getElementById('evStartDate').value  = r.startDate || currentDate;
+  document.getElementById('evRepeatUntil').value= r.endDate || '';
+
+  const isWeekly = (r.freq === 'weekly');
+  document.getElementById('weekdaysGroup').classList.toggle('hidden', !isWeekly);
+  document.querySelectorAll('.wday-cb').forEach(cb => {
+    cb.checked = (r.days || []).includes(parseInt(cb.value));
+  });
+
+  selectedColor = r.color || CAT_COLORS[r.cat] || '#1565C0';
+  document.querySelectorAll('#evColor .color-dot').forEach(d =>
+    d.classList.toggle('selected', d.dataset.color === selectedColor));
+
   openModal('addEventModal');
 }
 
 function deleteEvent(id) {
-  if (id.includes('_')) { showToast('🗑️ Delete from Recurring Classes manager.'); openModal('recurringModal'); renderRecurringList(); return; }
+  if (!id) return;
+  if (id.includes('_')) {
+    const recurId = id.split('_')[0];
+    if (!confirm('Delete this routine class from your timetable? This will remove all recurring instances.')) return;
+    deleteRecurring(recurId);
+    refreshAll();
+    if (document.getElementById('view-week').classList.contains('active'))  renderWeek();
+    if (document.getElementById('view-month').classList.contains('active')) renderMonth();
+    showToast('🗑️ Routine class deleted.');
+    return;
+  }
   if (!confirm('Delete this event?')) return;
-  const data=dayData(currentDate);
-  data.events=data.events.filter(e=>e.id!==id);
+  const data = dayData(currentDate);
+  data.events = data.events.filter(e => e.id !== id);
   save(); renderSchedule(); renderStats();
   if (document.getElementById('view-week').classList.contains('active'))  renderWeek();
   if (document.getElementById('view-month').classList.contains('active')) renderMonth();
@@ -488,55 +601,56 @@ function deleteEvent(id) {
 
 function toggleEventDone(id) {
   if (id.includes('_')) return;
-  const ev=dayData(currentDate).events.find(e=>e.id===id);
-  if (ev){ev.done=!ev.done;save();renderSchedule();renderStats();}
+  const ev = dayData(currentDate).events.find(e => e.id === id);
+  if (ev) { ev.done = !ev.done; save(); renderSchedule(); renderStats(); }
 }
 
 function quickAdd() {
-  const title=document.getElementById('quickTitle').value.trim();
-  if (!title){showToast('⚠️ Enter a title first.');return;}
-  const start=document.getElementById('quickStart').value;
-  const end  =document.getElementById('quickEnd').value;
-  const cat  =document.getElementById('quickCat').value;
-  if (start>=end){showToast('⚠️ End time must be after start.');return;}
-  const data=dayData(currentDate);
-  data.events.push({id:uid(),title,start,end,cat,color:CAT_COLORS[cat]||'#1565C0',priority:'normal',done:false,reminded:false});
-  data.events.sort((a,b)=>a.start.localeCompare(b.start));
-  document.getElementById('quickTitle').value='';
+  const title = document.getElementById('quickTitle').value.trim();
+  if (!title) { showToast('⚠️ Enter a title first.'); return; }
+  const start = document.getElementById('quickStart').value;
+  const end   = document.getElementById('quickEnd').value;
+  const cat   = document.getElementById('quickCat').value;
+  if (start >= end) { showToast('⚠️ End time must be after start.'); return; }
+  const data = dayData(currentDate);
+  data.events.push({ id: uid(), title, start, end, cat, color: CAT_COLORS[cat] || '#1565C0', priority: 'normal', done: false, reminded: false });
+  data.events.sort((a, b) => a.start.localeCompare(b.start));
+  document.getElementById('quickTitle').value = '';
   save(); renderSchedule(); renderStats();
   showToast('⚡ Added to timetable!');
 }
 
 function renderSchedule() {
-  const list  = document.getElementById('scheduleList');
-  const filter= document.getElementById('filterCategory').value;
-  let events  = getEventsForDate(currentDate);
-  if (filter!=='all') events=events.filter(e=>e.cat===filter);
+  const list   = document.getElementById('scheduleList');
+  const filter = document.getElementById('filterCategory').value;
+  let events   = getEventsForDate(currentDate);
+  if (filter !== 'all') events = events.filter(e => e.cat === filter);
 
   if (!events.length) {
-    list.innerHTML=`<div class="empty-state"><i class="fas fa-calendar-day"></i>
+    list.innerHTML = `<div class="empty-state"><i class="fas fa-calendar-day"></i>
       <p>No events today. Click <b>Add Event</b> or use Quick Add.</p></div>`;
     return;
   }
-  list.innerHTML=events.map(ev=>`
-    <div class="event-card ${ev.done?'done':''} ${ev.isRecurring?'is-recurring':''}" onclick="editEvent('${ev.id}')">
-      <div class="event-stripe" style="background:${ev.color||CAT_COLORS[ev.cat]||'#1565C0'}"></div>
+  list.innerHTML = events.map(ev => `
+    <div class="event-card ${ev.done ? 'done' : ''} ${ev.isRecurring ? 'is-recurring' : ''}" onclick="editEvent('${ev.id}')">
+      <div class="event-stripe" style="background:${ev.color || CAT_COLORS[ev.cat] || '#1565C0'}"></div>
       <div class="ev-body">
         <div class="ev-title">
-          ${CAT_ICONS[ev.cat]||'📌'} ${esc(ev.title)}
-          ${ev.isRecurring?'<span class="ev-recurring-badge"><i class="fas fa-redo"></i> Routine</span>':''}
+          ${CAT_ICONS[ev.cat] || '📌'} ${esc(ev.title)}
+          ${ev.isRecurring ? '<span class="ev-recurring-badge"><i class="fas fa-redo"></i> Routine</span>' : ''}
         </div>
         <div class="ev-meta">
-          <span class="ev-time"><i class="fas fa-clock"></i> ${ev.start}–${ev.end} (${dur(ev.start,ev.end)})</span>
-          <span class="ev-cat-badge" style="background:${CAT_COLORS[ev.cat]||'#1565C0'}">${ev.cat}</span>
-          ${ev.priority==='high'?'<span class="ev-priority">🔴 Urgent</span>':''}
-          ${ev.priority==='low'?'<span class="ev-priority">🟢 Low</span>':''}
-          ${ev.location?`<span class="ev-location"><i class="fas fa-map-marker-alt"></i> ${esc(ev.location)}</span>`:''}
+          <span class="ev-time"><i class="fas fa-clock"></i> ${ev.start}–${ev.end} (${dur(ev.start, ev.end)})</span>
+          <span class="ev-cat-badge" style="background:${CAT_COLORS[ev.cat] || '#1565C0'}">${ev.cat}</span>
+          ${ev.priority === 'high' ? '<span class="ev-priority">🔴 Urgent</span>' : ''}
+          ${ev.priority === 'low' ? '<span class="ev-priority">🟢 Low</span>' : ''}
+          ${ev.location ? `<span class="ev-location"><i class="fas fa-map-marker-alt"></i> ${esc(ev.location)}</span>` : ''}
         </div>
-        ${ev.notes?`<div style="font-size:11px;color:var(--text-light);margin-top:3px">${esc(ev.notes)}</div>`:''}
+        ${ev.notes ? `<div style="font-size:11px;color:var(--text-light);margin-top:3px">${esc(ev.notes)}</div>` : ''}
       </div>
       <div class="ev-actions" onclick="event.stopPropagation()">
-        ${!ev.isRecurring?`<button class="ev-btn done-btn" title="${ev.done?'Undo':'Mark done'}" onclick="toggleEventDone('${ev.id}')"><i class="fas fa-${ev.done?'undo':'check'}"></i></button>`:''}
+        <button class="ev-btn edit-btn" title="Edit Class" onclick="editEvent('${ev.id}')"><i class="fas fa-edit"></i></button>
+        ${!ev.isRecurring ? `<button class="ev-btn done-btn" title="${ev.done ? 'Undo' : 'Mark done'}" onclick="toggleEventDone('${ev.id}')"><i class="fas fa-${ev.done ? 'undo' : 'check'}"></i></button>` : ''}
         <button class="ev-btn del-btn" title="Delete" onclick="deleteEvent('${ev.id}')"><i class="fas fa-trash"></i></button>
       </div>
     </div>`).join('');
@@ -674,8 +788,7 @@ function renderMonth() {
   grid.innerHTML=html;
 }
 
-function goToDate(dateStr){currentDate=dateStr;document.getElementById('dayPicker').value=currentDate;switchView('dashboard');refreshAll();}
-function switchView(v){document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.view===v));document.querySelectorAll('.view').forEach(s=>s.classList.toggle('active',s.id==='view-'+v));}
+function goToDate(dateStr){currentDate=dateStr;document.getElementById('dayPicker').value=currentDate;switchView('dashboard');}
 
 // ══════════════════════════════════════════
 // TIMELINE
@@ -995,12 +1108,12 @@ function initPWA(){
   });
 }
 function installApp(){
-  if(!deferredInstall){
-    showToast('ℹ️ To install: On Chrome/Edge click the install icon in the address bar, or on iPhone tap Share → Add to Home Screen.', 5000);
-    return;
+  if(deferredInstall){
+    deferredInstall.prompt();
+    deferredInstall.userChoice.then(()=>{deferredInstall=null;});
+  } else {
+    openModal('installHelpModal');
   }
-  deferredInstall.prompt();
-  deferredInstall.userChoice.then(()=>{deferredInstall=null;});
 }
 
 // ══════════════════════════════════════════
@@ -1040,8 +1153,14 @@ function exportData(){
 // ══════════════════════════════════════════
 // MODALS
 // ══════════════════════════════════════════
-function openModal(id){document.getElementById(id).classList.add('open');}
-function closeModal(id){document.getElementById(id).classList.remove('open');}
+function openModal(id){
+  const el = document.getElementById(id);
+  if (el) el.classList.add('open');
+}
+function closeModal(id){
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('open');
+}
 document.addEventListener('click',e=>{if(e.target.classList.contains('modal-overlay'))e.target.classList.remove('open');});
 
 // ══════════════════════════════════════════
@@ -1049,32 +1168,139 @@ document.addEventListener('click',e=>{if(e.target.classList.contains('modal-over
 // ══════════════════════════════════════════
 let toastTimer;
 function showToast(msg,dur=2800){
-  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  const t=document.getElementById('toast');
+  if(!t) return;
+  t.textContent=msg;t.classList.add('show');
   clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),dur);
 }
 
 // ══════════════════════════════════════════
-// USER BADGE & DROPDOWN MENU
+// USER BADGE & PERSONAL INFORMATION
 // ══════════════════════════════════════════
 function initUserBadge() {
-  const user = CURRENT_USER;
-  if (!user) return;
-  const initial = (user.displayName || 'U').charAt(0).toUpperCase();
-  const name    = user.displayName || user.username || 'User';
-  const role    = (user.role === 'teacher') ? 'Teacher / Dr.' : 'Student';
-  const roleIcon= (user.role === 'teacher') ? 'fa-chalkboard-teacher' : 'fa-user-graduate';
+  const user     = getCurrentUser() || CURRENT_USER || {};
+  const settings = globalData.settings || {};
+  const name     = user.displayName || user.name || settings.name || user.username || 'Student';
+  const initial  = name.charAt(0).toUpperCase() || 'S';
+  const role     = (user.role === 'teacher') ? 'Teacher / Dr.' : 'Student';
+  const roleIcon = (user.role === 'teacher') ? 'fa-chalkboard-teacher' : 'fa-user-graduate';
+  const email    = user.email || (user.username && !user.username.includes('@') ? user.username + '@student.edu' : (user.username || ''));
 
   const avatarEl = document.getElementById('userAvatar');
   const nameEl   = document.getElementById('userName');
   const udAvatar = document.getElementById('udAvatar');
   const udName   = document.getElementById('udName');
   const udRole   = document.getElementById('udRole');
+  const udEmail  = document.getElementById('udEmailSub');
 
   if (avatarEl) avatarEl.textContent = initial;
   if (nameEl)   nameEl.textContent   = name;
   if (udAvatar) udAvatar.textContent = initial;
   if (udName)   udName.textContent   = name;
   if (udRole)   udRole.innerHTML     = `<i class="fas ${roleIcon}"></i> ${role}`;
+  if (udEmail)  udEmail.textContent  = email ? email : 'Personal Info ›';
+}
+
+function openPersonalInfoModal() {
+  const user     = getCurrentUser() || CURRENT_USER || {};
+  const settings = globalData.settings || {};
+  const name     = user.displayName || user.name || settings.name || user.username || '';
+  const email    = user.email || '';
+  const username = user.username || (user.email ? user.email.split('@')[0] : '');
+  const role     = user.role || 'student';
+  const major    = user.major || settings.major || '';
+  const school   = user.school || settings.school || '';
+
+  const nameInp   = document.getElementById('piFullName');
+  const emailInp  = document.getElementById('piEmail');
+  const userInp   = document.getElementById('piUsername');
+  const roleSel   = document.getElementById('piRole');
+  const majorInp  = document.getElementById('piMajor');
+  const schoolInp = document.getElementById('piSchool');
+  const avEl      = document.getElementById('piLargeAvatar');
+  const headingEl = document.getElementById('piHeadingName');
+
+  if (nameInp)   nameInp.value   = name;
+  if (emailInp)  emailInp.value  = email;
+  if (userInp)   userInp.value   = username;
+  if (roleSel)   roleSel.value   = role;
+  if (majorInp)  majorInp.value  = major;
+  if (schoolInp) schoolInp.value = school;
+  if (avEl)      avEl.textContent = (name || 'S').charAt(0).toUpperCase();
+  if (headingEl) headingEl.textContent = name || 'Student Profile';
+
+  openModal('personalInfoModal');
+}
+
+async function savePersonalInfo() {
+  const name   = document.getElementById('piFullName').value.trim();
+  const email  = document.getElementById('piEmail').value.trim();
+  const role   = document.getElementById('piRole').value;
+  const major  = document.getElementById('piMajor').value.trim();
+  const school = document.getElementById('piSchool').value.trim();
+
+  if (!name) { showToast('⚠️ Name is required.'); return; }
+  if (!email || !email.includes('@')) { showToast('⚠️ Valid email is required.'); return; }
+
+  if (!globalData.settings) globalData.settings = {};
+  globalData.settings.name   = name;
+  globalData.settings.major  = major;
+  globalData.settings.school = school;
+
+  let session = getCurrentUser() || {};
+  session.displayName = name;
+  session.name        = name;
+  session.email       = email;
+  session.role        = role;
+  session.major       = major;
+  session.school      = school;
+
+  const sessionStr = JSON.stringify(session);
+  sessionStorage.setItem('ib_session', sessionStr);
+  if (localStorage.getItem('ib_remember')) {
+    localStorage.setItem('ib_remember', sessionStr);
+  }
+
+  // Sync to Firestore users collection
+  if (typeof firebase !== 'undefined' && firebase.apps.length && session.uid) {
+    try {
+      await firebase.firestore().collection('users').doc(session.uid).set({
+        displayName: name,
+        email: email,
+        role: role,
+        major: major,
+        school: school,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    } catch (e) {
+      console.warn('Profile update note:', e);
+    }
+  }
+
+  save();
+  initUserBadge();
+  closeModal('personalInfoModal');
+  showToast('✅ Personal information updated!');
+}
+
+async function sendPasswordResetFromProfile() {
+  const user  = getCurrentUser() || CURRENT_USER || {};
+  const email = (document.getElementById('piEmail')?.value || user.email || '').trim();
+  if (!email || !email.includes('@')) {
+    showToast('⚠️ Please enter a valid email address first.');
+    return;
+  }
+  if (!confirm(`Send password reset email to ${email}?`)) return;
+  try {
+    if (typeof firebase !== 'undefined' && firebase.auth) {
+      await firebase.auth().sendPasswordResetEmail(email);
+      showToast('✉️ Reset email sent! Check your inbox.');
+    } else {
+      showToast('⚠️ Cloud authentication service unavailable.');
+    }
+  } catch (err) {
+    showToast('❌ ' + (err.message || 'Failed to send reset email.'));
+  }
 }
 
 function toggleUserDropdown(e) {
@@ -1109,34 +1335,48 @@ function logout() {
 // ══════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════
-document.addEventListener('DOMContentLoaded',()=>{
+document.addEventListener('DOMContentLoaded', () => {
+  try {
+    // ── One-time cleanup: wipe old auto-seeded data ──
+    const cleaned = localStorage.getItem('ib_cleaned_v3');
+    if (!cleaned) {
+      localStorage.removeItem('ib_db');
+      localStorage.removeItem('ib_global');
+      localStorage.removeItem('ib_seeded_v2');
+      localStorage.removeItem('ib_student_seeded');
+      localStorage.removeItem('ib_student_seeded_v2');
+      localStorage.setItem('ib_cleaned_v3', '1');
+    }
+  } catch (e) { console.warn('Clean error:', e); }
 
-  // ── One-time cleanup: wipe old auto-seeded data ──
-  const cleaned = localStorage.getItem('ib_cleaned_v3');
-  if (!cleaned) {
-    localStorage.removeItem('ib_db');
-    localStorage.removeItem('ib_global');
-    localStorage.removeItem('ib_seeded_v2');
-    localStorage.removeItem('ib_student_seeded');
-    localStorage.removeItem('ib_student_seeded_v2');
-    localStorage.setItem('ib_cleaned_v3','1');
-  }
+  try { load(); } catch (e) { console.error('load error:', e); }
+  try { loadSettings(); } catch (e) { console.error('loadSettings error:', e); }
+  try { startClock(); } catch (e) { console.error('startClock error:', e); }
+  try { initNav(); } catch (e) { console.error('initNav error:', e); }
+  try { initPWA(); } catch (e) { console.error('initPWA error:', e); }
+  try { initNotifications(); } catch (e) { console.error('initNotifications error:', e); }
+  try { initUserBadge(); } catch (e) { console.error('initUserBadge error:', e); }
+  try { initCloudSync(); } catch (e) { console.error('initCloudSync error:', e); }
 
-  load();loadSettings();startClock();initNav();initPWA();initNotifications();
-  initUserBadge();
-  initCloudSync();
+  currentDate = todayStr();
+  const dp = document.getElementById('dayPicker');
+  if (dp) dp.value = currentDate;
+  const evSd = document.getElementById('evStartDate');
+  if (evSd) evSd.value = currentDate;
+  currentWeekStart = getWeekStart(new Date());
+  const now = new Date();
+  currentMonth = { year: now.getFullYear(), month: now.getMonth() };
 
-  currentDate=todayStr();
-  document.getElementById('dayPicker').value=currentDate;
-  document.getElementById('evStartDate').value=currentDate;
-  currentWeekStart=getWeekStart(new Date());
-  const now=new Date();
-  currentMonth={year:now.getFullYear(),month:now.getMonth()};
+  try {
+    refreshAll();
+    renderTasks();
+    renderNotes();
+    renderContacts();
+  } catch (e) { console.error('render error:', e); }
 
-  refreshAll();renderTasks();renderNotes();renderContacts();
-
-  const name = CURRENT_USER ? CURRENT_USER.displayName : '';
-  showToast(`🎓 Welcome${name?' back, '+name:''}! Cloud sync active.`, 4000);
+  const u = getCurrentUser() || CURRENT_USER;
+  const name = u ? (u.displayName || u.name || u.username) : '';
+  showToast(`🎓 Welcome${name ? ' back, ' + name : ''}! Cloud sync active.`, 3500);
 });
 
 

@@ -14,7 +14,7 @@
   <link rel="manifest" href="manifest.json"/>
   <link rel="apple-touch-icon" href="icon-192.svg"/>
 
-  <link rel="stylesheet" href="style.css?v=5"/>
+  <link rel="stylesheet" href="style.css?v=6"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
 </head>
 <body>
@@ -44,25 +44,26 @@
 <!-- ══════════════ HEADER ══════════════ -->
 <header class="site-header">
   <div class="logo">
-    <span class="logo-ib">IB</span>
+    <div class="logo-ib">IB</div>
     <div class="logo-text">
-      <span class="brand-title">Student Planner</span>
+      <span class="brand-title">IB Planner</span>
       <span class="brand-sub">Full Day Academic Manager</span>
     </div>
   </div>
 
   <nav class="top-nav">
-    <button class="nav-btn active" data-view="dashboard"><i class="fas fa-th-large"></i><span> My Day</span></button>
-    <button class="nav-btn" data-view="week"><i class="fas fa-calendar-week"></i><span> Week</span></button>
-    <button class="nav-btn" data-view="month"><i class="fas fa-calendar-alt"></i><span> Month</span></button>
-    <button class="nav-btn" data-view="timeline"><i class="fas fa-stream"></i><span> Timeline</span></button>
-    <button class="nav-btn" data-view="tasks"><i class="fas fa-tasks"></i><span> Assignments</span></button>
-    <button class="nav-btn" data-view="notes"><i class="fas fa-sticky-note"></i><span> Notes</span></button>
-    <button class="nav-btn" data-view="contacts"><i class="fas fa-user-graduate"></i><span> People</span></button>
-    <button class="nav-btn" data-view="analytics"><i class="fas fa-chart-bar"></i><span> Analytics</span></button>
+    <button class="nav-btn active" data-view="dashboard" onclick="switchView('dashboard')"><i class="fas fa-th-large"></i><span> My Day</span></button>
+    <button class="nav-btn" data-view="week" onclick="switchView('week')"><i class="fas fa-calendar-week"></i><span> Week</span></button>
+    <button class="nav-btn" data-view="month" onclick="switchView('month')"><i class="fas fa-calendar-alt"></i><span> Month</span></button>
+    <button class="nav-btn" data-view="timeline" onclick="switchView('timeline')"><i class="fas fa-stream"></i><span> Timeline</span></button>
+    <button class="nav-btn" data-view="tasks" onclick="switchView('tasks')"><i class="fas fa-tasks"></i><span> Assignments</span></button>
+    <button class="nav-btn" data-view="notes" onclick="switchView('notes')"><i class="fas fa-sticky-note"></i><span> Notes</span></button>
+    <button class="nav-btn" data-view="contacts" onclick="switchView('contacts')"><i class="fas fa-user-graduate"></i><span> People</span></button>
+    <button class="nav-btn" data-view="analytics" onclick="switchView('analytics')"><i class="fas fa-chart-bar"></i><span> Analytics</span></button>
   </nav>
 
   <div class="header-right">
+    <i class="fas fa-cloud" id="cloudSyncStatus" title="Cloud Sync: Connected" style="font-size:13px;color:#4CAF50;opacity:0.85"></i>
     <div class="clock-box" id="liveClock"></div>
 
     <!-- User Profile Dropdown Button -->
@@ -75,14 +76,22 @@
 
       <!-- Dropdown Window containing all actions -->
       <div class="user-dropdown-menu" id="userDropdown">
-        <div class="ud-header">
+        <div class="ud-header" onclick="openPersonalInfoModal(); closeUserDropdown();" title="Click to view & edit Personal Information">
           <div class="ud-avatar" id="udAvatar"></div>
           <div class="ud-info">
             <div class="ud-name" id="udName"></div>
             <div class="ud-role" id="udRole"><i class="fas fa-user-graduate"></i> Student</div>
+            <div class="ud-email-sub" id="udEmailSub">Personal Info ›</div>
           </div>
+          <i class="fas fa-pen ud-edit-badge" title="Edit Profile"></i>
         </div>
         <div class="ud-divider"></div>
+        <button class="ud-item" onclick="openPersonalInfoModal(); closeUserDropdown();">
+          <i class="fas fa-user-edit"></i> <span>Personal Information</span>
+        </button>
+        <button class="ud-item ud-install" id="udInstallBtn" onclick="installApp(); closeUserDropdown();">
+          <i class="fas fa-download"></i> <span>Install App</span>
+        </button>
         <button class="ud-item" onclick="openModal('settingsModal'); closeUserDropdown();">
           <i class="fas fa-cog"></i> <span>Settings</span>
         </button>
@@ -421,6 +430,7 @@
     </div>
     <div class="modal-body">
       <input type="hidden" id="editEventId"/>
+      <input type="hidden" id="editRecurId"/>
       <div class="form-row">
         <div class="form-group" style="grid-column:1/-1">
           <label>Title * (e.g. "Math 102", "Biology Lab", "Study session")</label>
@@ -686,6 +696,112 @@
   </div>
 </div>
 
+<!-- Personal Information Modal -->
+<div class="modal-overlay" id="personalInfoModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3><i class="fas fa-id-card"></i> Personal Information</h3>
+      <button class="modal-close" onclick="closeModal('personalInfoModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="pi-avatar-row">
+        <div class="pi-large-avatar" id="piLargeAvatar">S</div>
+        <div>
+          <h4 id="piHeadingName" style="margin:0;font-size:16px;color:var(--text)">Student</h4>
+          <span id="piRoleBadge" class="ev-cat-badge" style="background:#1565C0;color:#fff;font-size:11px;padding:2px 8px;border-radius:12px">Student</span>
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:14px">
+        <label>Full Name *</label>
+        <input type="text" id="piFullName" placeholder="Your full name"/>
+      </div>
+      <div class="form-group">
+        <label>Email Address * (for account recovery &amp; contact)</label>
+        <input type="email" id="piEmail" placeholder="your.email@example.com"/>
+      </div>
+      <div class="form-group">
+        <label>Username (used for sign in)</label>
+        <input type="text" id="piUsername" readonly style="opacity:0.75;background:var(--bg)"/>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Academic Role</label>
+          <select id="piRole">
+            <option value="student">🎓 Student</option>
+            <option value="teacher">👨‍🏫 Teacher / Dr.</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Department / Major</label>
+          <input type="text" id="piMajor" placeholder="e.g. Computer Science, Medicine"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>University / School</label>
+        <input type="text" id="piSchool" placeholder="e.g. University Name / IB School"/>
+      </div>
+
+      <div style="margin-top:16px;padding:12px;background:#F0F7FF;border:1px solid #BBDEFB;border-radius:8px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:12px;font-weight:600;color:#0D1B2A">Security &amp; Password</div>
+          <div style="font-size:11px;color:#546E7A">Send a password reset link to your email</div>
+        </div>
+        <button type="button" class="btn-secondary" style="font-size:11px;padding:5px 10px" onclick="sendPasswordResetFromProfile()">
+          <i class="fas fa-key"></i> Reset Password
+        </button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('personalInfoModal')">Cancel</button>
+      <button class="btn-primary" onclick="savePersonalInfo()"><i class="fas fa-save"></i> Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Install Help Modal -->
+<div class="modal-overlay" id="installHelpModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3><i class="fas fa-download"></i> Install IB Student Planner</h3>
+      <button class="modal-close" onclick="closeModal('installHelpModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div style="text-align:center;padding:10px 0 16px">
+        <div style="width:52px;height:52px;background:#1565C0;color:#fff;font-weight:900;font-size:24px;border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px">IB</div>
+        <h4 style="margin:0 0 4px">Install on your Phone or PC</h4>
+        <p style="font-size:12px;color:var(--text-light);margin:0">Use IB Planner like a native mobile or desktop app without downloading from an app store.</p>
+      </div>
+
+      <div class="install-guide-step">
+        <div class="igs-icon"><i class="fab fa-apple"></i></div>
+        <div class="igs-text">
+          <b>iPhone / iPad (Safari)</b>
+          <p>Tap the <b>Share</b> button (<i class="fas fa-share-square"></i>) at the bottom of Safari, then scroll down and tap <b>"Add to Home Screen"</b> (<i class="fas fa-plus-square"></i>).</p>
+        </div>
+      </div>
+
+      <div class="install-guide-step">
+        <div class="igs-icon"><i class="fab fa-android"></i></div>
+        <div class="igs-text">
+          <b>Android (Chrome)</b>
+          <p>Tap the three dots (<b>⋮</b>) in Chrome at top-right, then select <b>"Install app"</b> or <b>"Add to Home Screen"</b>.</p>
+        </div>
+      </div>
+
+      <div class="install-guide-step">
+        <div class="igs-icon"><i class="fas fa-laptop"></i></div>
+        <div class="igs-text">
+          <b>PC / Mac (Chrome / Edge)</b>
+          <p>Click the <b>Install</b> icon (<i class="fas fa-download"></i>) in the browser address bar at the top right, or menu <b>⋮ → Install IB Planner</b>.</p>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-primary" onclick="closeModal('installHelpModal')">Got it!</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -700,7 +816,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js?v=5"></script>
-<script src="app.js?v=5"></script>
+<script src="firebase-config.js?v=6"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>

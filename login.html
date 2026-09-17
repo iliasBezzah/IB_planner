@@ -365,7 +365,10 @@
       </div>
 
       <div class="form-group">
-        <label>Password</label>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <label style="margin:0">Password</label>
+          <a class="forgot-link" onclick="forgotPassword()" style="font-size:12px;color:#1565C0;cursor:pointer;font-weight:600">Forgot password?</a>
+        </div>
         <div class="input-wrap">
           <i class="fas fa-lock input-icon"></i>
           <input type="password" id="siPassword" autocomplete="current-password"/>
@@ -422,19 +425,28 @@
       </div>
 
       <div class="form-group">
-        <label>Full Name</label>
+        <label>Full Name *</label>
         <div class="input-wrap">
           <i class="fas fa-id-card input-icon"></i>
-          <input type="text" id="suName" autocomplete="name"/>
+          <input type="text" id="suName" autocomplete="name" placeholder="e.g. Ilias Bezzah"/>
         </div>
         <div class="error-msg" id="suNameErr"><i class="fas fa-times-circle"></i><span></span></div>
       </div>
 
       <div class="form-group">
-        <label>Username (or Email)</label>
+        <label>Email Address * (for password recovery &amp; contact)</label>
+        <div class="input-wrap">
+          <i class="fas fa-envelope input-icon"></i>
+          <input type="email" id="suEmail" autocomplete="email" placeholder="e.g. ilias@example.com"/>
+        </div>
+        <div class="error-msg" id="suEmailErr"><i class="fas fa-times-circle"></i><span></span></div>
+      </div>
+
+      <div class="form-group">
+        <label>Username * (for quick sign in)</label>
         <div class="input-wrap">
           <i class="fas fa-at input-icon"></i>
-          <input type="text" id="suUsername" autocomplete="username"
+          <input type="text" id="suUsername" autocomplete="username" placeholder="e.g. ilias"
             oninput="this.value=this.value.toLowerCase().replace(/\s/g,'')"/>
         </div>
         <div class="error-msg" id="suUsernameErr"><i class="fas fa-times-circle"></i><span></span></div>
@@ -586,6 +598,31 @@ function pwIsValid(pw) {
   return PW_RULES.every(r => r.test(pw));
 }
 
+// ── FORGOT PASSWORD ──
+async function forgotPassword() {
+  const defaultVal = document.getElementById('siUsername').value.trim();
+  const input = prompt('Enter your email address to receive a password reset link:', defaultVal.includes('@') ? defaultVal : '');
+  if (!input || !input.trim()) return;
+  const email = input.trim().toLowerCase();
+  if (!email.includes('@') || !email.includes('.')) {
+    alert('Please enter a valid email address.');
+    return;
+  }
+  try {
+    await firebase.auth().sendPasswordResetEmail(email);
+    showAlert('signinAlert', 'signinAlertMsg', `✅ Password reset email sent to ${email}! Please check your inbox and spam folder.`);
+    const al = document.getElementById('signinAlert');
+    if (al) { al.className = 'alert success show'; }
+  } catch (err) {
+    let msg = 'Failed to send reset email.';
+    if (err.code === 'auth/user-not-found') msg = 'No account found with this email.';
+    else if (err.message) msg = err.message;
+    showAlert('signinAlert', 'signinAlertMsg', '⚠️ ' + msg);
+    const al = document.getElementById('signinAlert');
+    if (al) { al.className = 'alert error show'; }
+  }
+}
+
 // ── SIGN IN WITH FIREBASE ──
 async function signIn() {
   clearErrors();
@@ -599,17 +636,32 @@ async function signIn() {
   if (!password) { setErr('siPassword', 'Password is required'); ok = false; }
   if (!ok) return;
 
-  const email = formatAuthEmail(rawUser);
   btn.disabled = true;
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in…';
 
+  let emailToAuth = rawUser.toLowerCase();
+  if (!emailToAuth.includes('@')) {
+    // Look up real email from username if registered
+    try {
+      const uDoc = await firebase.firestore().collection('usernames').doc(emailToAuth).get();
+      if (uDoc.exists && uDoc.data().email) {
+        emailToAuth = uDoc.data().email;
+      } else {
+        emailToAuth = formatAuthEmail(rawUser);
+      }
+    } catch {
+      emailToAuth = formatAuthEmail(rawUser);
+    }
+  }
+
   try {
-    const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
+    const userCredential = await firebase.auth().signInWithEmailAndPassword(emailToAuth, password);
     const user = userCredential.user;
 
-    // Fetch user profile from Firestore if available
+    // Fetch user profile from Firestore
     let displayName = user.displayName || rawUser;
     let role        = 'student';
+    let realEmail   = user.email || (rawUser.includes('@') ? rawUser : '');
 
     try {
       const doc = await firebase.firestore().collection('users').doc(user.uid).get();
@@ -617,6 +669,7 @@ async function signIn() {
         const data = doc.data();
         displayName = data.displayName || displayName;
         role        = data.role || role;
+        realEmail   = data.email || realEmail;
       }
     } catch (e) {
       console.warn('Firestore profile load note:', e);
@@ -624,8 +677,8 @@ async function signIn() {
 
     const session = JSON.stringify({
       uid: user.uid,
-      username: extractUsername(email),
-      email: user.email,
+      username: rawUser.includes('@') ? (displayName || rawUser.split('@')[0]) : rawUser,
+      email: realEmail,
       displayName: displayName,
       role: role
     });
@@ -654,14 +707,18 @@ async function signIn() {
 async function signUp() {
   clearErrors();
   const name     = document.getElementById('suName').value.trim();
-  const rawUser  = document.getElementById('suUsername').value.trim();
+  const email    = document.getElementById('suEmail').value.trim().toLowerCase();
+  const rawUser  = document.getElementById('suUsername').value.trim().toLowerCase();
   const password = document.getElementById('suPassword').value;
   const confirm  = document.getElementById('suConfirm').value;
   const btn      = document.getElementById('btnSignUp');
   let ok = true;
 
   if (!name)    { setErr('suName', 'Full name is required'); ok = false; }
-  if (!rawUser) { setErr('suUsername', 'Username or email is required'); ok = false; }
+  if (!email)   { setErr('suEmail', 'Email address is required'); ok = false; }
+  else if (!email.includes('@') || !email.includes('.')) { setErr('suEmail', 'Enter a valid email address'); ok = false; }
+
+  if (!rawUser) { setErr('suUsername', 'Username is required'); ok = false; }
   else if (rawUser.length < 3) { setErr('suUsername', 'Must be at least 3 characters'); ok = false; }
 
   if (!password) {
@@ -672,7 +729,6 @@ async function signUp() {
   if (password && confirm !== password) { setErr('suConfirm', 'Passwords do not match'); ok = false; }
   if (!ok) return;
 
-  const email = formatAuthEmail(rawUser);
   btn.disabled = true;
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating account…';
 
@@ -682,14 +738,19 @@ async function signUp() {
 
     await user.updateProfile({ displayName: name });
 
-    // Store profile in Firestore
+    // Store user profile & username mapping in Firestore
     try {
       await firebase.firestore().collection('users').doc(user.uid).set({
-        username: extractUsername(email),
-        email: user.email,
+        username: rawUser,
+        email: email,
         displayName: name,
         role: selectedRole,
         createdAt: new Date().toISOString()
+      }, { merge: true });
+
+      await firebase.firestore().collection('usernames').doc(rawUser).set({
+        email: email,
+        uid: user.uid
       }, { merge: true });
     } catch (e) {
       console.warn('Firestore profile save note:', e);
@@ -699,8 +760,8 @@ async function signUp() {
 
     const session = JSON.stringify({
       uid: user.uid,
-      username: extractUsername(email),
-      email: user.email,
+      username: rawUser,
+      email: email,
       displayName: name,
       role: selectedRole
     });
@@ -717,7 +778,7 @@ async function signUp() {
     btn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
     let msg = 'Sign up failed.';
     if (error.code === 'auth/email-already-in-use') {
-      setErr('suUsername', 'This username or email is already registered.');
+      setErr('suEmail', 'This email address is already registered.');
       return;
     } else if (error.code === 'auth/weak-password') {
       setErr('suPassword', 'Password is too weak.');

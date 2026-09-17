@@ -205,7 +205,31 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 6px 10px;
+  padding: 8px 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.ud-header:hover {
+  background: var(--surface2);
+}
+.ud-edit-badge {
+  font-size: 11px;
+  color: var(--text-light);
+  margin-left: auto;
+  opacity: 0.7;
+}
+.ud-email-sub {
+  font-size: 10px;
+  color: var(--text-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+  margin-top: 1px;
+}
+.ud-install {
+  color: var(--primary);
 }
 .ud-avatar {
   width: 36px;
@@ -601,6 +625,9 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
 .recurring-item-body{flex:1;}
 .recurring-item-title{font-size:13px;font-weight:700;margin-bottom:3px;}
 .recurring-item-meta{font-size:11px;color:var(--text-light);}
+.recurring-item-actions{display:flex;align-items:center;gap:4px;flex-shrink:0;}
+.recurring-item-edit{background:none;border:none;color:var(--primary);cursor:pointer;font-size:14px;padding:4px;border-radius:4px;transition:all var(--transition);}
+.recurring-item-edit:hover{background:#E3F2FD;}
 .recurring-item-del{background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:4px;border-radius:4px;transition:all var(--transition);}
 .recurring-item-del:hover{background:#FFEBEE;}
 
@@ -779,4 +806,64 @@ textarea{resize:vertical;}
   .notif-banner{display:none!important;}
   body{background:white;color:black;}
   .panel{box-shadow:none;border:1px solid #ccc;}
+}
+
+/* ════════════════════════════════════════
+   PERSONAL INFO & INSTALL GUIDE STYLES
+════════════════════════════════════════ */
+.pi-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  background: #F0F7FF;
+  border-radius: 12px;
+  border: 1px solid #BBDEFB;
+}
+.pi-large-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 3px 8px rgba(21,101,192,0.3);
+}
+.install-guide-step {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: #F8FBFF;
+  border: 1px solid #E0E0E0;
+  border-radius: 10px;
+}
+.igs-icon {
+  font-size: 24px;
+  color: var(--primary);
+  width: 32px;
+  text-align: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.igs-text b {
+  font-size: 13px;
+  color: var(--text);
+  display: block;
+  margin-bottom: 4px;
+}
+.igs-text p {
+  font-size: 12px;
+  color: var(--text-light);
+  margin: 0;
+  line-height: 1.4;
+}
+.ev-btn.edit-btn {
+  color: var(--primary);
 }
