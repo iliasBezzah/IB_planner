@@ -59,11 +59,38 @@ const CAT_COLORS = {
 };
 
 // ══════════════════════════════════════════
-// PERSISTENCE  (per-user keys)
+// PERSISTENCE & CLOUD SYNC (Firebase Firestore + Local Cache)
 // ══════════════════════════════════════════
+let cloudSyncTimer = null;
+
 function save() {
+  // 1. Instant local persistence for fast UI
   localStorage.setItem('ib_db_'     + USER_KEY, JSON.stringify(db));
   localStorage.setItem('ib_global_' + USER_KEY, JSON.stringify(globalData));
+
+  // 2. Debounced Cloud Firestore sync (cross-device)
+  if (typeof firebase !== 'undefined' && firebase.apps.length && CURRENT_USER && (CURRENT_USER.uid || CURRENT_USER.username)) {
+    clearTimeout(cloudSyncTimer);
+    cloudSyncTimer = setTimeout(() => {
+      syncToCloud();
+    }, 600);
+  }
+}
+
+async function syncToCloud() {
+  try {
+    const docId = CURRENT_USER.uid || CURRENT_USER.username;
+    if (!docId) return;
+    await firebase.firestore().collection('userData').doc(docId).set({
+      db: JSON.stringify(db),
+      globalData: JSON.stringify(globalData),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    updateSyncIndicator(true);
+  } catch (err) {
+    console.warn('Cloud sync error:', err);
+    updateSyncIndicator(false);
+  }
 }
 
 function load() {
@@ -71,6 +98,63 @@ function load() {
   try { globalData = JSON.parse(localStorage.getItem('ib_global_' + USER_KEY) || '{}'); } catch { globalData = {}; }
   if (!globalData.recurring) globalData.recurring = [];
   if (!globalData.contacts)  globalData.contacts  = [];
+}
+
+// Subscribe to real-time cloud changes from other devices (phone <-> laptop)
+function initCloudSync() {
+  if (typeof firebase === 'undefined' || !firebase.apps.length) return;
+  const docId = CURRENT_USER && (CURRENT_USER.uid || CURRENT_USER.username);
+  if (!docId) return;
+
+  try {
+    firebase.firestore().collection('userData').doc(docId).onSnapshot(doc => {
+      if (doc.exists) {
+        const data = doc.data();
+        let changed = false;
+        if (data.db) {
+          try {
+            const cloudDb = JSON.parse(data.db);
+            if (JSON.stringify(cloudDb) !== JSON.stringify(db)) {
+              db = cloudDb;
+              localStorage.setItem('ib_db_' + USER_KEY, data.db);
+              changed = true;
+            }
+          } catch {}
+        }
+        if (data.globalData) {
+          try {
+            const cloudGlobal = JSON.parse(data.globalData);
+            if (JSON.stringify(cloudGlobal) !== JSON.stringify(globalData)) {
+              globalData = cloudGlobal;
+              localStorage.setItem('ib_global_' + USER_KEY, data.globalData);
+              changed = true;
+            }
+          } catch {}
+        }
+        if (changed) {
+          refreshAll();
+          renderTasks();
+          renderNotes();
+          renderContacts();
+          showToast('☁️ Synced with cloud data!', 2000);
+        }
+        updateSyncIndicator(true);
+      }
+    }, err => {
+      console.warn('Snapshot sync error:', err);
+      updateSyncIndicator(false);
+    });
+  } catch (e) {
+    console.warn('initCloudSync exception:', e);
+  }
+}
+
+function updateSyncIndicator(online) {
+  const badge = document.getElementById('cloudSyncStatus');
+  if (badge) {
+    badge.title = online ? 'Cloud Sync: Connected' : 'Cloud Sync: Offline';
+    badge.style.color = online ? '#4CAF50' : '#FFA000';
+  }
 }
 
 function dayData(date) {
@@ -966,6 +1050,9 @@ function initUserBadge() {
 
 function logout() {
   if (!confirm('Sign out of IB Student Planner?')) return;
+  if (typeof firebase !== 'undefined' && firebase.apps.length) {
+    firebase.auth().signOut().catch(() => {});
+  }
   sessionStorage.removeItem('ib_session');
   localStorage.removeItem('ib_remember');
   window.location.replace('login.html');
@@ -989,6 +1076,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   load();loadSettings();startClock();initNav();initPWA();initNotifications();
   initUserBadge();
+  initCloudSync();
 
   currentDate=todayStr();
   document.getElementById('dayPicker').value=currentDate;
@@ -1000,7 +1088,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   refreshAll();renderTasks();renderNotes();renderContacts();
 
   const name = CURRENT_USER ? CURRENT_USER.displayName : '';
-  showToast(`🎓 Welcome${name?' back, '+name:''}! Ready to plan your day.`, 4000);
+  showToast(`🎓 Welcome${name?' back, '+name:''}! Cloud sync active.`, 4000);
 });
 
 

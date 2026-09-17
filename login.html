@@ -5,10 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>IB Planner — Login</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+
+  <!-- Firebase App & Auth SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    /* ── Scrollable page ── */
     html { height: 100%; }
     body {
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -20,10 +26,9 @@
       justify-content: center;
       padding: 30px 16px 40px;
       position: relative;
-      overflow-y: auto;   /* ← scrollable */
+      overflow-y: auto;
     }
 
-    /* Decorative circles */
     body::before, body::after {
       content: '';
       position: fixed;
@@ -42,7 +47,6 @@
       z-index: 1;
     }
 
-    /* ── Logo ── */
     .logo-section {
       text-align: center;
       margin-bottom: 24px;
@@ -63,9 +67,8 @@
       box-shadow: 0 8px 32px rgba(0,0,0,0.2);
     }
     .logo-title { font-size: 21px; font-weight: 800; }
-    .logo-sub   { font-size: 12px; opacity: 0.8; margin-top: 3px; }
+    .logo-sub   { font-size: 12px; opacity: 0.85; margin-top: 3px; }
 
-    /* ── Card ── */
     .card {
       background: #fff;
       border-radius: 20px;
@@ -73,7 +76,6 @@
       overflow: hidden;
     }
 
-    /* ── Tabs ── */
     .tabs {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -102,7 +104,6 @@
     }
     .tab-btn:hover:not(.active) { color: #1976D2; }
 
-    /* ── Forms ── */
     .form-panel { display: none; padding: 26px 28px; }
     .form-panel.active { display: block; }
 
@@ -120,7 +121,6 @@
       margin-bottom: 5px;
     }
 
-    /* ── Input wrap ── */
     .input-wrap {
       position: relative;
       display: flex;
@@ -134,10 +134,9 @@
       pointer-events: none;
       z-index: 1;
     }
-    .input-wrap input,
-    .input-wrap select {
+    .input-wrap input {
       width: 100%;
-      padding: 10px 42px 10px 36px; /* right pad for eye button */
+      padding: 10px 42px 10px 36px;
       border: 1.5px solid #BBDEFB;
       border-radius: 10px;
       font-size: 14px;
@@ -145,12 +144,8 @@
       background: #F8FBFF;
       transition: border-color 0.2s, box-shadow 0.2s;
       font-family: inherit;
-      appearance: none;
     }
-    /* Select doesn't need right padding for eye */
-    .input-wrap select { padding-right: 14px; cursor: pointer; }
-    .input-wrap input:focus,
-    .input-wrap select:focus {
+    .input-wrap input:focus {
       outline: none;
       border-color: #1565C0;
       background: #fff;
@@ -158,7 +153,6 @@
     }
     .input-wrap input.error { border-color: #C62828; box-shadow: 0 0 0 3px rgba(198,40,40,0.1); }
 
-    /* ── Eye button — FIXED ── */
     .toggle-pw {
       position: absolute;
       right: 0;
@@ -178,7 +172,6 @@
     }
     .toggle-pw:hover { color: #1565C0; }
 
-    /* ── Role selector ── */
     .role-group {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -210,7 +203,6 @@
     .role-label { font-size: 12px; font-weight: 700; color: #0D1B2A; }
     .role-sub   { font-size: 10px; color: #546E7A; margin-top: 2px; }
 
-    /* ── Password rules checklist ── */
     .pw-rules {
       background: #F0F7FF;
       border: 1px solid #BBDEFB;
@@ -236,11 +228,10 @@
       color: #90A4AE;
       transition: color 0.2s;
     }
-    .pw-rule.ok         { color: #2E7D32; }
-    .pw-rule.ok i       { color: #2E7D32; }
-    .pw-rule.fail i     { color: #C62828; }
+    .pw-rule.ok     { color: #2E7D32; }
+    .pw-rule.ok i   { color: #2E7D32; }
+    .pw-rule.fail i { color: #C62828; }
 
-    /* ── Error messages ── */
     .error-msg {
       font-size: 11px;
       color: #C62828;
@@ -251,7 +242,6 @@
     }
     .error-msg.show { display: flex; }
 
-    /* ── Remember me ── */
     .remember-row {
       display: flex;
       align-items: center;
@@ -265,7 +255,6 @@
     }
     .remember-row label { font-size: 13px; color: #546E7A; cursor: pointer; margin: 0; }
 
-    /* ── Alert ── */
     .alert {
       padding: 10px 14px;
       border-radius: 8px;
@@ -280,7 +269,6 @@
     .alert.error   { background: #FFEBEE; color: #C62828; border: 1px solid #FFCDD2; }
     .alert.success { background: #E8F5E9; color: #2E7D32; border: 1px solid #C8E6C9; }
 
-    /* ── Submit button ── */
     .btn-submit {
       width: 100%;
       padding: 13px;
@@ -303,22 +291,19 @@
       box-shadow: 0 6px 20px rgba(21,101,192,0.35);
     }
     .btn-submit:active { transform: none; }
+    .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
 
-    /* ── Divider ── */
-    .divider {
+    .cloud-badge {
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin: 14px 0;
-      color: #90A4AE;
-      font-size: 12px;
-    }
-    .divider::before, .divider::after {
-      content: ''; flex: 1;
-      height: 1px; background: #BBDEFB;
+      justify-content: center;
+      gap: 6px;
+      font-size: 11px;
+      color: #0288D1;
+      margin-top: 15px;
+      font-weight: 600;
     }
 
-    /* ── Switch link ── */
     .switch-link {
       text-align: center;
       font-size: 13px;
@@ -328,29 +313,11 @@
     .switch-link a { color: #1565C0; font-weight: 700; cursor: pointer; }
     .switch-link a:hover { text-decoration: underline; }
 
-    /* ── User chips ── */
-    .users-list { margin-bottom: 14px; }
-    .users-list-label {
-      font-size: 11px; font-weight: 700; color: #546E7A;
-      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
-    }
-    .user-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-    .user-chip {
-      background: #EBF3FB; border: 1.5px solid #BBDEFB;
-      border-radius: 20px; padding: 5px 12px;
-      font-size: 12px; font-weight: 600; color: #1565C0;
-      cursor: pointer; transition: all 0.2s;
-      display: flex; align-items: center; gap: 6px;
-    }
-    .user-chip:hover { background: #1565C0; color: #fff; border-color: #1565C0; }
-    .user-role-icon { font-size: 13px; }
-
-    /* ── Footer ── */
     .login-footer {
       text-align: center;
       margin-top: 18px;
       font-size: 11px;
-      color: rgba(255,255,255,0.6);
+      color: rgba(255,255,255,0.7);
     }
 
     @media(max-width: 480px) {
@@ -362,17 +329,13 @@
 
 <div class="login-wrapper">
 
-  <!-- Logo -->
   <div class="logo-section">
     <div class="logo-badge">IB</div>
     <div class="logo-title">IB Planner</div>
-    <div class="logo-sub">Full Day Academic Manager</div>
+    <div class="logo-sub">Cloud-Synced Academic Manager</div>
   </div>
 
-  <!-- Card -->
   <div class="card">
-
-    <!-- Tabs -->
     <div class="tabs">
       <button class="tab-btn active" id="tabSignIn" onclick="switchTab('signin')">
         <i class="fas fa-sign-in-alt"></i> Sign In
@@ -385,14 +348,7 @@
     <!-- ══ SIGN IN ══ -->
     <div class="form-panel active" id="panelSignIn">
       <div class="form-title">Welcome back! 👋</div>
-      <div class="form-subtitle">Sign in to continue to your planner</div>
-
-      <!-- Existing accounts quick-pick -->
-      <div class="users-list" id="existingUsersList" style="display:none">
-        <div class="users-list-label"><i class="fas fa-users"></i> Accounts on this device</div>
-        <div class="user-chips" id="userChips"></div>
-        <div class="divider">or type manually</div>
-      </div>
+      <div class="form-subtitle">Sign in to sync your schedule across all devices</div>
 
       <div class="alert error" id="signinAlert">
         <i class="fas fa-exclamation-circle"></i>
@@ -400,7 +356,7 @@
       </div>
 
       <div class="form-group">
-        <label>Username</label>
+        <label>Username or Email</label>
         <div class="input-wrap">
           <i class="fas fa-user input-icon"></i>
           <input type="text" id="siUsername" autocomplete="username"/>
@@ -425,9 +381,13 @@
         <label for="rememberMe">Remember me on this device</label>
       </div>
 
-      <button class="btn-submit" onclick="signIn()">
+      <button class="btn-submit" id="btnSignIn" onclick="signIn()">
         <i class="fas fa-sign-in-alt"></i> Sign In
       </button>
+
+      <div class="cloud-badge">
+        <i class="fas fa-cloud"></i> Syncs automatically to phone &amp; laptop
+      </div>
 
       <div class="switch-link">
         No account yet? <a onclick="switchTab('signup')">Create one →</a>
@@ -436,8 +396,8 @@
 
     <!-- ══ SIGN UP ══ -->
     <div class="form-panel" id="panelSignUp">
-      <div class="form-title">Create an account 🎓</div>
-      <div class="form-subtitle">Fill in your details to get started</div>
+      <div class="form-title">Create your account 🎓</div>
+      <div class="form-subtitle">Access your schedule anywhere in the world</div>
 
       <div class="alert error"   id="signupAlertErr"><i class="fas fa-exclamation-circle"></i><span id="signupAlertErrMsg"></span></div>
       <div class="alert success" id="signupAlertOk"> <i class="fas fa-check-circle"></i><span id="signupAlertOkMsg"></span></div>
@@ -461,7 +421,6 @@
         </div>
       </div>
 
-      <!-- Full name -->
       <div class="form-group">
         <label>Full Name</label>
         <div class="input-wrap">
@@ -471,9 +430,8 @@
         <div class="error-msg" id="suNameErr"><i class="fas fa-times-circle"></i><span></span></div>
       </div>
 
-      <!-- Username -->
       <div class="form-group">
-        <label>Username</label>
+        <label>Username (or Email)</label>
         <div class="input-wrap">
           <i class="fas fa-at input-icon"></i>
           <input type="text" id="suUsername" autocomplete="username"
@@ -482,7 +440,6 @@
         <div class="error-msg" id="suUsernameErr"><i class="fas fa-times-circle"></i><span></span></div>
       </div>
 
-      <!-- Password -->
       <div class="form-group">
         <label>Password</label>
         <div class="input-wrap">
@@ -493,7 +450,6 @@
             <i class="fas fa-eye"></i>
           </button>
         </div>
-        <!-- Live rules checklist -->
         <div class="pw-rules" id="pwRules">
           <div class="pw-rule" id="rule-len"><i class="fas fa-circle"></i> At least 8 characters</div>
           <div class="pw-rule" id="rule-upper"><i class="fas fa-circle"></i> At least one uppercase letter (A–Z)</div>
@@ -503,7 +459,6 @@
         <div class="error-msg" id="suPasswordErr"><i class="fas fa-times-circle"></i><span></span></div>
       </div>
 
-      <!-- Confirm password -->
       <div class="form-group">
         <label>Confirm Password</label>
         <div class="input-wrap">
@@ -516,7 +471,7 @@
         <div class="error-msg" id="suConfirmErr"><i class="fas fa-times-circle"></i><span></span></div>
       </div>
 
-      <button class="btn-submit" onclick="signUp()">
+      <button class="btn-submit" id="btnSignUp" onclick="signUp()">
         <i class="fas fa-user-plus"></i> Create Account
       </button>
 
@@ -524,48 +479,45 @@
         Already have an account? <a onclick="switchTab('signin')">Sign in →</a>
       </div>
     </div>
-
-  </div><!-- /card -->
-
-  <div class="login-footer">
-    <i class="fas fa-lock"></i> Your data is stored only on this device
   </div>
 
-</div><!-- /login-wrapper -->
+  <div class="login-footer">
+    <i class="fas fa-shield-alt"></i> Secured with Google Firebase Cloud
+  </div>
+</div>
 
 <script>
 /* ══════════════════════════════════════════
-   IB Planner — Auth Logic
+   Firebase Auth & Multi-Device Sync Logic
 ══════════════════════════════════════════ */
 
-// ── Redirect if already logged in ──
+// Format username into an email for Firebase Auth if not already an email
+function formatAuthEmail(input) {
+  const clean = input.trim().toLowerCase();
+  if (clean.includes('@')) return clean;
+  return clean + '@ibplanner.cloud';
+}
+
+function extractUsername(emailOrUser) {
+  if (emailOrUser.includes('@ibplanner.cloud')) {
+    return emailOrUser.split('@')[0];
+  }
+  return emailOrUser;
+}
+
+// Redirect if already logged in
 (function(){
   try {
     const s = sessionStorage.getItem('ib_session') || localStorage.getItem('ib_remember');
     if (s) {
       const u = JSON.parse(s);
-      if (u && u.username) window.location.replace('index.html');
+      if (u && (u.uid || u.username)) {
+        window.location.replace('index.html');
+      }
     }
   } catch {}
 })();
 
-// ── Hash function (client-side) ──
-function hashPw(str) {
-  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
-  for (let i = 0; i < str.length; i++) {
-    const ch = str.charCodeAt(i);
-    h1 = Math.imul(h1 ^ ch, 2654435761);
-    h2 = Math.imul(h2 ^ ch, 1597334677);
-  }
-  h1 = Math.imul(h1 ^ (h1>>>16), 2246822507) ^ Math.imul(h2 ^ (h2>>>13), 3266489909);
-  h2 = Math.imul(h2 ^ (h2>>>16), 2246822507) ^ Math.imul(h1 ^ (h1>>>13), 3266489909);
-  return (4294967296 * (2097151 & h2) + (h1>>>0)).toString(36);
-}
-
-function getUsers() { try { return JSON.parse(localStorage.getItem('ib_users') || '[]'); } catch { return []; } }
-function saveUsers(u) { localStorage.setItem('ib_users', JSON.stringify(u)); }
-
-// ── Role selector ──
 let selectedRole = 'student';
 function selectRole(role) {
   selectedRole = role;
@@ -573,7 +525,6 @@ function selectRole(role) {
   document.getElementById('roleTeacher').classList.toggle('selected', role === 'teacher');
 }
 
-// ── Tab switch ──
 function switchTab(tab) {
   document.getElementById('panelSignIn').classList.toggle('active', tab === 'signin');
   document.getElementById('panelSignUp').classList.toggle('active', tab === 'signup');
@@ -582,22 +533,21 @@ function switchTab(tab) {
   clearErrors();
 }
 
-// ── Eye toggle — FIXED ──
 function togglePw(inputId, btn) {
-  const inp     = document.getElementById(inputId);
-  const icon    = btn.querySelector('i');
+  const inp      = document.getElementById(inputId);
+  const icon     = btn.querySelector('i');
   const isHidden = inp.type === 'password';
   inp.type       = isHidden ? 'text' : 'password';
   icon.className = isHidden ? 'fas fa-eye-slash' : 'fas fa-eye';
 }
 
-// ── Error helpers ──
 function setErr(id, msg) {
   const errEl = document.getElementById(id + 'Err');
   if (errEl) { errEl.querySelector('span').textContent = msg; errEl.classList.add('show'); }
   const inp = document.getElementById(id);
   if (inp) inp.classList.add('error');
 }
+
 function clearErrors() {
   document.querySelectorAll('.error-msg').forEach(e => {
     e.classList.remove('show');
@@ -608,17 +558,17 @@ function clearErrors() {
     const el = document.getElementById(id); if (el) el.classList.remove('show');
   });
 }
+
 function showAlert(id, msgId, msg) {
   const el = document.getElementById(id); if (el) el.classList.add('show');
   const m  = document.getElementById(msgId); if (m) m.textContent = msg;
 }
 
-// ── Password rules live check ──
 const PW_RULES = [
-  { id: 'rule-len',     test: pw => pw.length >= 8,                label: 'At least 8 characters' },
-  { id: 'rule-upper',   test: pw => /[A-Z]/.test(pw),              label: 'At least one uppercase letter (A–Z)' },
-  { id: 'rule-num',     test: pw => /[0-9]/.test(pw),              label: 'At least one number (0–9)' },
-  { id: 'rule-special', test: pw => /[^A-Za-z0-9]/.test(pw),       label: 'At least one special character (! @ # …)' },
+  { id: 'rule-len',     test: pw => pw.length >= 8 },
+  { id: 'rule-upper',   test: pw => /[A-Z]/.test(pw) },
+  { id: 'rule-num',     test: pw => /[0-9]/.test(pw) },
+  { id: 'rule-special', test: pw => /[^A-Za-z0-9]/.test(pw) },
 ];
 
 function checkPwRules(pw) {
@@ -636,101 +586,154 @@ function pwIsValid(pw) {
   return PW_RULES.every(r => r.test(pw));
 }
 
-// ── User chips (quick login) ──
-function loadUserChips() {
-  const users = getUsers();
-  const wrap  = document.getElementById('existingUsersList');
-  const chips = document.getElementById('userChips');
-  if (!users.length) { wrap.style.display = 'none'; return; }
-  wrap.style.display = 'block';
-  chips.innerHTML = users.map(u => `
-    <div class="user-chip" onclick="fillUser('${u.username}')">
-      <span class="user-role-icon">${u.role === 'teacher' ? '👨‍🏫' : '🎓'}</span>
-      ${u.displayName}
-    </div>`).join('');
-}
-function fillUser(username) {
-  document.getElementById('siUsername').value = username;
-  document.getElementById('siPassword').focus();
-}
-
-// ── SIGN IN ──
-function signIn() {
+// ── SIGN IN WITH FIREBASE ──
+async function signIn() {
   clearErrors();
-  const username = document.getElementById('siUsername').value.trim().toLowerCase();
+  const rawUser  = document.getElementById('siUsername').value.trim();
   const password = document.getElementById('siPassword').value;
   const remember = document.getElementById('rememberMe').checked;
+  const btn      = document.getElementById('btnSignIn');
   let ok = true;
 
-  if (!username) { setErr('siUsername', 'Username is required'); ok = false; }
+  if (!rawUser)  { setErr('siUsername', 'Username or email is required'); ok = false; }
   if (!password) { setErr('siPassword', 'Password is required'); ok = false; }
   if (!ok) return;
 
-  const user = getUsers().find(u => u.username === username);
-  if (!user)                              { showAlert('signinAlert', 'signinAlertMsg', 'No account found with this username.'); return; }
-  if (user.passwordHash !== hashPw(password)) { showAlert('signinAlert', 'signinAlertMsg', 'Incorrect password. Please try again.'); return; }
+  const email = formatAuthEmail(rawUser);
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in…';
 
-  const session = JSON.stringify({ username: user.username, displayName: user.displayName, role: user.role || 'student' });
-  sessionStorage.setItem('ib_session', session);
-  if (remember) localStorage.setItem('ib_remember', session);
-  else          localStorage.removeItem('ib_remember');
+  try {
+    const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
+    const user = userCredential.user;
 
-  window.location.replace('index.html');
+    // Fetch user profile from Firestore if available
+    let displayName = user.displayName || rawUser;
+    let role        = 'student';
+
+    try {
+      const doc = await firebase.firestore().collection('users').doc(user.uid).get();
+      if (doc.exists) {
+        const data = doc.data();
+        displayName = data.displayName || displayName;
+        role        = data.role || role;
+      }
+    } catch (e) {
+      console.warn('Firestore profile load note:', e);
+    }
+
+    const session = JSON.stringify({
+      uid: user.uid,
+      username: extractUsername(email),
+      email: user.email,
+      displayName: displayName,
+      role: role
+    });
+
+    sessionStorage.setItem('ib_session', session);
+    if (remember) localStorage.setItem('ib_remember', session);
+    else          localStorage.removeItem('ib_remember');
+
+    window.location.replace('index.html');
+  } catch (error) {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
+    let msg = 'Sign in failed. Please check your credentials.';
+    if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+      msg = 'Incorrect username/email or password.';
+    } else if (error.code === 'auth/network-request-failed') {
+      msg = 'Network error. Please check your internet connection.';
+    } else if (error.message) {
+      msg = error.message;
+    }
+    showAlert('signinAlert', 'signinAlertMsg', msg);
+  }
 }
 
-// ── SIGN UP ──
-function signUp() {
+// ── SIGN UP WITH FIREBASE ──
+async function signUp() {
   clearErrors();
   const name     = document.getElementById('suName').value.trim();
-  const username = document.getElementById('suUsername').value.trim().toLowerCase();
+  const rawUser  = document.getElementById('suUsername').value.trim();
   const password = document.getElementById('suPassword').value;
   const confirm  = document.getElementById('suConfirm').value;
+  const btn      = document.getElementById('btnSignUp');
   let ok = true;
 
-  if (!name)                    { setErr('suName',     'Full name is required');                         ok = false; }
-  if (!username)                { setErr('suUsername', 'Username is required');                          ok = false; }
-  else if (username.length < 3) { setErr('suUsername', 'Username must be at least 3 characters');       ok = false; }
-  else if (!/^[a-z0-9_]+$/.test(username)) { setErr('suUsername', 'Only letters, numbers and _ allowed'); ok = false; }
+  if (!name)    { setErr('suName', 'Full name is required'); ok = false; }
+  if (!rawUser) { setErr('suUsername', 'Username or email is required'); ok = false; }
+  else if (rawUser.length < 3) { setErr('suUsername', 'Must be at least 3 characters'); ok = false; }
 
   if (!password) {
     setErr('suPassword', 'Password is required'); ok = false;
   } else if (!pwIsValid(password)) {
-    setErr('suPassword', 'Password does not meet all requirements'); ok = false;
+    setErr('suPassword', 'Password must meet all 4 criteria above'); ok = false;
   }
   if (password && confirm !== password) { setErr('suConfirm', 'Passwords do not match'); ok = false; }
   if (!ok) return;
 
-  const users = getUsers();
-  if (users.find(u => u.username === username)) { setErr('suUsername', 'This username is already taken'); return; }
+  const email = formatAuthEmail(rawUser);
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating account…';
 
-  users.push({
-    username,
-    displayName:  name,
-    role:         selectedRole,
-    passwordHash: hashPw(password),
-    createdAt:    new Date().toISOString().split('T')[0]
-  });
-  saveUsers(users);
+  try {
+    const userCredential = await firebase.auth().createUserWithEmailAndPassword(email, password);
+    const user = userCredential.user;
 
-  showAlert('signupAlertOk', 'signupAlertOkMsg', `✅ Account created! Welcome, ${name}. Signing you in…`);
+    await user.updateProfile({ displayName: name });
 
-  setTimeout(() => {
-    const session = JSON.stringify({ username, displayName: name, role: selectedRole });
+    // Store profile in Firestore
+    try {
+      await firebase.firestore().collection('users').doc(user.uid).set({
+        username: extractUsername(email),
+        email: user.email,
+        displayName: name,
+        role: selectedRole,
+        createdAt: new Date().toISOString()
+      }, { merge: true });
+    } catch (e) {
+      console.warn('Firestore profile save note:', e);
+    }
+
+    showAlert('signupAlertOk', 'signupAlertOkMsg', `✅ Account created! Welcome, ${name}. Connecting you…`);
+
+    const session = JSON.stringify({
+      uid: user.uid,
+      username: extractUsername(email),
+      email: user.email,
+      displayName: name,
+      role: selectedRole
+    });
+
     sessionStorage.setItem('ib_session', session);
     localStorage.setItem('ib_remember', session);
-    window.location.replace('index.html');
-  }, 1200);
+
+    setTimeout(() => {
+      window.location.replace('index.html');
+    }, 1200);
+
+  } catch (error) {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
+    let msg = 'Sign up failed.';
+    if (error.code === 'auth/email-already-in-use') {
+      setErr('suUsername', 'This username or email is already registered.');
+      return;
+    } else if (error.code === 'auth/weak-password') {
+      setErr('suPassword', 'Password is too weak.');
+      return;
+    } else if (error.message) {
+      msg = error.message;
+    }
+    showAlert('signupAlertErr', 'signupAlertErrMsg', msg);
+  }
 }
 
-// ── Enter key support ──
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
   if (document.getElementById('panelSignIn').classList.contains('active')) signIn();
   else signUp();
 });
-
-// ── Init ──
-loadUserChips();
 </script>
 </body>
 </html>
