@@ -63,7 +63,10 @@
   </nav>
 
   <div class="header-right">
-    <i class="fas fa-cloud" id="cloudSyncStatus" title="Cloud Sync: Connected" style="font-size:13px;color:#4CAF50;opacity:0.85"></i>
+    <button class="btn-sync-cloud" id="cloudSyncBtn" onclick="pullFromCloud(false)" title="Click to sync now with other devices">
+      <i class="fas fa-cloud" id="cloudSyncStatus"></i>
+      <span class="sync-status-text" id="syncStatusText">Synced</span>
+    </button>
     <div class="clock-box" id="liveClock"></div>
 
     <!-- User Profile Dropdown Button -->
@@ -86,6 +89,9 @@
           <i class="fas fa-pen ud-edit-badge" title="Edit Profile"></i>
         </div>
         <div class="ud-divider"></div>
+        <button class="ud-item" onclick="pullFromCloud(false); closeUserDropdown();">
+          <i class="fas fa-sync-alt"></i> <span>Sync Data Now</span>
+        </button>
         <button class="ud-item" onclick="openPersonalInfoModal(); closeUserDropdown();">
           <i class="fas fa-user-edit"></i> <span>Personal Information</span>
         </button>

@@ -119,6 +119,30 @@ body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--
 .header-right{display:flex;align-items:center;gap:10px;flex-shrink:0;}
 .clock-box{font-size:20px;font-weight:700;letter-spacing:1px;min-width:70px;}
 .date-box{font-size:10px;opacity:.8;white-space:nowrap;}
+.btn-sync-cloud {
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 20px;
+  color: #fff;
+  cursor: pointer;
+  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-family: inherit;
+  transition: all var(--transition);
+}
+.btn-sync-cloud:hover {
+  background: rgba(255, 255, 255, 0.28);
+  border-color: rgba(255, 255, 255, 0.6);
+  transform: translateY(-1px);
+}
+.sync-status-text {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.95;
+}
 /* ─── User Menu & Dropdown Window ─── */
 .user-menu-container {
   position: relative;
@@ -723,6 +747,8 @@ textarea{resize:vertical;}
   .user-name{max-width:90px;font-size:11px;}
   .clock-box{font-size:14px;min-width:44px;font-weight:700;}
   .date-box{display:none;}
+  .btn-sync-cloud{padding:3px 6px;gap:4px;}
+  .sync-status-text{display:none;}
   .user-dropdown-menu{
     width:205px;right:0;top:calc(100% + 6px);
   }

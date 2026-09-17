@@ -22,8 +22,8 @@ function getCurrentUser() {
     return s ? JSON.parse(s) : null;
   } catch { return null; }
 }
-const CURRENT_USER = getCurrentUser();
-const USER_KEY     = CURRENT_USER ? CURRENT_USER.username : 'guest';
+let CURRENT_USER = getCurrentUser();
+let USER_KEY     = CURRENT_USER ? (CURRENT_USER.username || CURRENT_USER.email || 'user').toLowerCase().replace(/[^a-z0-9_]/g, '_') : 'guest';
 
 // ──────────────────────────────────────────
 // Student Category Maps
@@ -59,37 +59,198 @@ const CAT_COLORS = {
 };
 
 // ══════════════════════════════════════════
-// PERSISTENCE & CLOUD SYNC (Firebase Firestore + Local Cache)
+// PERSISTENCE & REAL-TIME CROSS-DEVICE CLOUD SYNC
 // ══════════════════════════════════════════
 let cloudSyncTimer = null;
+let lastCloudSyncTime = 0;
+let unsubscribeCloudSync = null;
 
-function save() {
+// Canonical document ID guaranteed identical across PC, Phone, and Tablet
+function getCloudDocId() {
+  const u = getCurrentUser() || CURRENT_USER;
+  if (!u) return null;
+  const username = u.username || (u.email ? u.email.split('@')[0] : null);
+  if (username) {
+    return 'user_' + username.toLowerCase().trim().replace(/[^a-z0-9_]/g, '_');
+  }
+  if (u.uid) return 'uid_' + u.uid;
+  return 'guest';
+}
+
+function save(immediateSync = false) {
   // 1. Instant local persistence for fast UI
-  localStorage.setItem('ib_db_'     + USER_KEY, JSON.stringify(db));
-  localStorage.setItem('ib_global_' + USER_KEY, JSON.stringify(globalData));
+  try {
+    localStorage.setItem('ib_db_'     + USER_KEY, JSON.stringify(db));
+    localStorage.setItem('ib_global_' + USER_KEY, JSON.stringify(globalData));
+  } catch (e) {
+    console.warn('Local save warning:', e);
+  }
 
-  // 2. Debounced Cloud Firestore sync (cross-device)
-  if (typeof firebase !== 'undefined' && firebase.apps.length && CURRENT_USER && (CURRENT_USER.uid || CURRENT_USER.username)) {
+  // 2. Real-time Cross-Device Cloud Sync
+  if (typeof firebase !== 'undefined' && firebase.apps.length && CURRENT_USER) {
     clearTimeout(cloudSyncTimer);
-    cloudSyncTimer = setTimeout(() => {
+    if (immediateSync) {
       syncToCloud();
-    }, 600);
+    } else {
+      cloudSyncTimer = setTimeout(() => {
+        syncToCloud();
+      }, 300);
+    }
   }
 }
 
 async function syncToCloud() {
   try {
-    const docId = CURRENT_USER.uid || CURRENT_USER.username;
+    const docId = getCloudDocId();
     if (!docId) return;
+
+    updateSyncIndicator('syncing');
+    const now = Date.now();
+    lastCloudSyncTime = now;
+
     await firebase.firestore().collection('userData').doc(docId).set({
       db: JSON.stringify(db),
       globalData: JSON.stringify(globalData),
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      updatedAt: now,
+      username: CURRENT_USER.username || '',
+      email: CURRENT_USER.email || '',
+      displayName: CURRENT_USER.displayName || '',
+      lastDevice: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'mobile' : 'desktop'
     }, { merge: true });
+
     updateSyncIndicator(true);
   } catch (err) {
     console.warn('Cloud sync error:', err);
     updateSyncIndicator(false);
+  }
+}
+
+async function pullFromCloud(silent = false) {
+  if (typeof firebase === 'undefined' || !firebase.apps.length) return;
+  const docId = getCloudDocId();
+  if (!docId) return;
+
+  updateSyncIndicator('syncing');
+
+  try {
+    const doc = await firebase.firestore().collection('userData').doc(docId).get();
+    if (doc.exists) {
+      applyCloudData(doc.data(), silent);
+      updateSyncIndicator(true);
+    } else {
+      // First time initialization: upload current local data to cloud
+      if (Object.keys(db).length > 0) {
+        await syncToCloud();
+      }
+      updateSyncIndicator(true);
+    }
+  } catch (err) {
+    console.warn('pullFromCloud error:', err);
+    updateSyncIndicator(false);
+    if (!silent) {
+      showToast('⚠️ Cloud sync offline. Using local copy.');
+    }
+  }
+}
+
+function mergeDatabases(localDb, cloudDb) {
+  const merged = { ...cloudDb };
+  for (const date in localDb) {
+    if (!merged[date]) {
+      merged[date] = localDb[date];
+    } else {
+      const cloudEvents = merged[date].events || [];
+      const localEvents = localDb[date].events || [];
+      const evMap = new Map();
+      cloudEvents.forEach(e => { if (e && e.id) evMap.set(e.id, e); });
+      localEvents.forEach(e => {
+        if (e && e.id && !evMap.has(e.id)) evMap.set(e.id, e);
+      });
+      merged[date].events = Array.from(evMap.values()).sort((a,b) => (a.start||'').localeCompare(b.start||''));
+
+      const cloudTasks = merged[date].tasks || [];
+      const localTasks = localDb[date].tasks || [];
+      const tMap = new Map();
+      cloudTasks.forEach(t => { if (t && t.id) tMap.set(t.id, t); });
+      localTasks.forEach(t => {
+        if (t && t.id && !tMap.has(t.id)) tMap.set(t.id, t);
+      });
+      merged[date].tasks = Array.from(tMap.values());
+
+      const cloudGoals = merged[date].goals || [];
+      const localGoals = localDb[date].goals || [];
+      const gMap = new Map();
+      cloudGoals.forEach(g => { if (g && g.id) gMap.set(g.id, g); });
+      localGoals.forEach(g => {
+        if (g && g.id && !gMap.has(g.id)) gMap.set(g.id, g);
+      });
+      merged[date].goals = Array.from(gMap.values());
+    }
+  }
+  return merged;
+}
+
+function mergeGlobalData(localG, cloudG) {
+  const merged = { ...cloudG, ...localG };
+  const rMap = new Map();
+  (cloudG.recurring || []).forEach(r => { if (r && r.id) rMap.set(r.id, r); });
+  (localG.recurring || []).forEach(r => { if (r && r.id && !rMap.has(r.id)) rMap.set(r.id, r); });
+  merged.recurring = Array.from(rMap.values());
+
+  const cMap = new Map();
+  (cloudG.contacts || []).forEach(c => { if (c && c.id) cMap.set(c.id, c); });
+  (localG.contacts || []).forEach(c => { if (c && c.id && !cMap.has(c.id)) cMap.set(c.id, c); });
+  merged.contacts = Array.from(cMap.values());
+
+  return merged;
+}
+
+function applyCloudData(data, silent = false) {
+  let changed = false;
+  const cloudTime = data.updatedAt || 0;
+
+  if (data.db) {
+    try {
+      const cloudDb = JSON.parse(data.db);
+      if (JSON.stringify(cloudDb) !== JSON.stringify(db)) {
+        if (cloudTime >= lastCloudSyncTime || Object.keys(db).length === 0) {
+          db = cloudDb;
+        } else {
+          db = mergeDatabases(db, cloudDb);
+        }
+        localStorage.setItem('ib_db_' + USER_KEY, JSON.stringify(db));
+        changed = true;
+      }
+    } catch (e) { console.warn('Cloud db parse error:', e); }
+  }
+
+  if (data.globalData) {
+    try {
+      const cloudGlobal = JSON.parse(data.globalData);
+      if (JSON.stringify(cloudGlobal) !== JSON.stringify(globalData)) {
+        if (cloudTime >= lastCloudSyncTime || !(globalData.recurring && globalData.recurring.length)) {
+          globalData = cloudGlobal;
+        } else {
+          globalData = mergeGlobalData(globalData, cloudGlobal);
+        }
+        localStorage.setItem('ib_global_' + USER_KEY, JSON.stringify(globalData));
+        changed = true;
+      }
+    } catch (e) { console.warn('Cloud global parse error:', e); }
+  }
+
+  if (changed) {
+    refreshAll();
+    if (document.getElementById('view-week')?.classList.contains('active')) renderWeek();
+    if (document.getElementById('view-month')?.classList.contains('active')) renderMonth();
+    if (document.getElementById('view-timeline')?.classList.contains('active')) renderTimeline();
+    renderTasks();
+    renderNotes();
+    renderContacts();
+    renderAnalytics();
+    if (!silent) {
+      showToast('☁️ Synced with all your devices!');
+    }
   }
 }
 
@@ -103,41 +264,18 @@ function load() {
 // Subscribe to real-time cloud changes from other devices (phone <-> laptop)
 function initCloudSync() {
   if (typeof firebase === 'undefined' || !firebase.apps.length) return;
-  const docId = CURRENT_USER && (CURRENT_USER.uid || CURRENT_USER.username);
+  const docId = getCloudDocId();
   if (!docId) return;
 
+  // 1. Pull latest cloud data immediately
+  pullFromCloud(true);
+
+  // 2. Real-time live updates
   try {
-    firebase.firestore().collection('userData').doc(docId).onSnapshot(doc => {
+    if (unsubscribeCloudSync) unsubscribeCloudSync();
+    unsubscribeCloudSync = firebase.firestore().collection('userData').doc(docId).onSnapshot(doc => {
       if (doc.exists) {
-        const data = doc.data();
-        let changed = false;
-        if (data.db) {
-          try {
-            const cloudDb = JSON.parse(data.db);
-            if (JSON.stringify(cloudDb) !== JSON.stringify(db)) {
-              db = cloudDb;
-              localStorage.setItem('ib_db_' + USER_KEY, data.db);
-              changed = true;
-            }
-          } catch {}
-        }
-        if (data.globalData) {
-          try {
-            const cloudGlobal = JSON.parse(data.globalData);
-            if (JSON.stringify(cloudGlobal) !== JSON.stringify(globalData)) {
-              globalData = cloudGlobal;
-              localStorage.setItem('ib_global_' + USER_KEY, data.globalData);
-              changed = true;
-            }
-          } catch {}
-        }
-        if (changed) {
-          refreshAll();
-          renderTasks();
-          renderNotes();
-          renderContacts();
-          showToast('☁️ Synced with cloud data!', 2000);
-        }
+        applyCloudData(doc.data(), true);
         updateSyncIndicator(true);
       }
     }, err => {
@@ -147,13 +285,43 @@ function initCloudSync() {
   } catch (e) {
     console.warn('initCloudSync exception:', e);
   }
+
+  // 3. Auto-sync on visibility change (mobile phone wake-up / app switch)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      pullFromCloud(true);
+    }
+  });
+  window.addEventListener('focus', () => {
+    pullFromCloud(true);
+  });
+  window.addEventListener('online', () => {
+    pullFromCloud(false);
+  });
 }
 
-function updateSyncIndicator(online) {
-  const badge = document.getElementById('cloudSyncStatus');
-  if (badge) {
-    badge.title = online ? 'Cloud Sync: Connected' : 'Cloud Sync: Offline';
-    badge.style.color = online ? '#4CAF50' : '#FFA000';
+function updateSyncIndicator(status) {
+  const icon = document.getElementById('cloudSyncStatus');
+  const text = document.getElementById('syncStatusText');
+  const btn  = document.getElementById('cloudSyncBtn');
+
+  if (!icon) return;
+
+  if (status === 'syncing') {
+    icon.className = 'fas fa-sync fa-spin';
+    icon.style.color = '#0288D1';
+    if (text) text.textContent = 'Syncing…';
+    if (btn) btn.title = 'Syncing with Cloud…';
+  } else if (status === true) {
+    icon.className = 'fas fa-cloud';
+    icon.style.color = '#4CAF50';
+    if (text) text.textContent = 'Synced';
+    if (btn) btn.title = `Cloud Sync: Active (${getCloudDocId()}). Click to refresh now.`;
+  } else {
+    icon.className = 'fas fa-cloud-rain';
+    icon.style.color = '#FFA000';
+    if (text) text.textContent = 'Offline';
+    if (btn) btn.title = 'Cloud Sync: Offline. Click to reconnect.';
   }
 }
 
