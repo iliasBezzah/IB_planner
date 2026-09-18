@@ -2,7 +2,7 @@
    ║  IB Day Programme — Service Worker (PWA Offline)    ║
    ╚══════════════════════════════════════════════════════╝ */
 
-const CACHE_NAME = 'ib-planner-v6';
+const CACHE_NAME = 'ib-planner-v7';
 const ASSETS = [
   './',
   './index.html',

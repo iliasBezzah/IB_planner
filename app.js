@@ -65,16 +65,25 @@ let cloudSyncTimer = null;
 let lastCloudSyncTime = 0;
 let unsubscribeCloudSync = null;
 
-// Canonical document ID guaranteed identical across PC, Phone, and Tablet
-function getCloudDocId() {
+// Canonical document IDs guaranteed across PC, Phone, and Tablet
+function getCloudDocIds() {
   const u = getCurrentUser() || CURRENT_USER;
-  if (!u) return null;
+  if (!u) return ['guest'];
+  const ids = [];
   const username = u.username || (u.email ? u.email.split('@')[0] : null);
   if (username) {
-    return 'user_' + username.toLowerCase().trim().replace(/[^a-z0-9_]/g, '_');
+    const cleanUser = username.toLowerCase().trim().replace(/[^a-z0-9_]/g, '_');
+    ids.push('user_' + cleanUser);
+    ids.push(cleanUser);
   }
-  if (u.uid) return 'uid_' + u.uid;
-  return 'guest';
+  if (u.uid) {
+    ids.push(u.uid);
+  }
+  return [...new Set(ids)];
+}
+
+function getCloudDocId() {
+  return getCloudDocIds()[0] || 'guest';
 }
 
 function save(immediateSync = false) {
@@ -101,22 +110,31 @@ function save(immediateSync = false) {
 
 async function syncToCloud() {
   try {
-    const docId = getCloudDocId();
-    if (!docId) return;
+    if (typeof firebase === 'undefined' || !firebase.apps.length) return;
+    const docIds = getCloudDocIds();
+    if (!docIds.length) return;
 
     updateSyncIndicator('syncing');
     const now = Date.now();
     lastCloudSyncTime = now;
 
-    await firebase.firestore().collection('userData').doc(docId).set({
+    const u = getCurrentUser() || CURRENT_USER || {};
+    const username = (u.username || (u.email ? u.email.split('@')[0] : '')).toLowerCase().trim();
+
+    const payload = {
       db: JSON.stringify(db),
       globalData: JSON.stringify(globalData),
       updatedAt: now,
-      username: CURRENT_USER.username || '',
-      email: CURRENT_USER.email || '',
-      displayName: CURRENT_USER.displayName || '',
+      username: username,
+      email: u.email || '',
+      displayName: u.displayName || u.name || username,
       lastDevice: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'mobile' : 'desktop'
-    }, { merge: true });
+    };
+
+    // Save simultaneously to all alias documents so both new and older versions sync
+    await Promise.allSettled(docIds.map(id =>
+      firebase.firestore().collection('userData').doc(id).set(payload, { merge: true })
+    ));
 
     updateSyncIndicator(true);
   } catch (err) {
@@ -127,19 +145,58 @@ async function syncToCloud() {
 
 async function pullFromCloud(silent = false) {
   if (typeof firebase === 'undefined' || !firebase.apps.length) return;
-  const docId = getCloudDocId();
-  if (!docId) return;
+  const docIds = getCloudDocIds();
+  if (!docIds.length) return;
 
   updateSyncIndicator('syncing');
 
   try {
-    const doc = await firebase.firestore().collection('userData').doc(docId).get();
-    if (doc.exists) {
-      applyCloudData(doc.data(), silent);
+    // Fetch all candidate documents in parallel
+    const docs = await Promise.all(
+      docIds.map(id => firebase.firestore().collection('userData').doc(id).get().catch(() => null))
+    );
+
+    const validDocs = docs.filter(d => d && d.exists && d.data());
+
+    if (validDocs.length > 0) {
+      // Pick the document with the richest data or newest update
+      let bestData = null;
+      let maxScore = -1;
+
+      for (const d of validDocs) {
+        const data = d.data();
+        let score = (data.updatedAt || 0);
+        let items = 0;
+        if (data.globalData) {
+          try {
+            const g = JSON.parse(data.globalData);
+            items += (g.recurring || []).length * 10;
+            items += (g.contacts || []).length;
+          } catch(e) {}
+        }
+        if (data.db) {
+          try {
+            const dObj = JSON.parse(data.db);
+            for (const k in dObj) {
+              items += (dObj[k].events || []).length;
+              items += (dObj[k].tasks || []).length;
+            }
+          } catch(e) {}
+        }
+        // Heavily weight actual data items so empty overwrite documents are rejected
+        const totalScore = items * 1000000000000 + score;
+        if (totalScore > maxScore) {
+          maxScore = totalScore;
+          bestData = data;
+        }
+      }
+
+      if (bestData) {
+        applyCloudData(bestData, silent);
+      }
       updateSyncIndicator(true);
     } else {
-      // First time initialization: upload current local data to cloud
-      if (Object.keys(db).length > 0) {
+      if (Object.keys(db).length > 0 || (globalData.recurring && globalData.recurring.length)) {
         await syncToCloud();
       }
       updateSyncIndicator(true);
@@ -790,13 +847,66 @@ function quickAdd() {
 
 function renderSchedule() {
   const list   = document.getElementById('scheduleList');
-  const filter = document.getElementById('filterCategory').value;
+  if (!list) return;
+  const filter = document.getElementById('filterCategory')?.value || 'all';
   let events   = getEventsForDate(currentDate);
   if (filter !== 'all') events = events.filter(e => e.cat === filter);
 
   if (!events.length) {
-    list.innerHTML = `<div class="empty-state"><i class="fas fa-calendar-day"></i>
-      <p>No events today. Click <b>Add Event</b> or use Quick Add.</p></div>`;
+    const recs = globalData.recurring || [];
+    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+    // Find next upcoming day that has routine classes
+    let nextDateWithClass = null;
+    let nextClassTitle = '';
+    if (recs.length > 0) {
+      for (let i = 1; i <= 14; i++) {
+        const testDate = offset(currentDate, i);
+        const testEvents = getEventsForDate(testDate);
+        if (testEvents.length > 0) {
+          nextDateWithClass = testDate;
+          nextClassTitle = testEvents[0].title;
+          break;
+        }
+      }
+    }
+
+    let routineHtml = '';
+    if (recs.length > 0) {
+      routineHtml = `
+        <div class="empty-routine-box">
+          <div class="erb-header"><i class="fas fa-redo"></i> You have ${recs.length} routine class${recs.length > 1 ? 'es' : ''} configured:</div>
+          <div class="erb-list">
+            ${recs.map(r => `
+              <div class="erb-item" onclick="editRecurringClass('${r.id}')">
+                <span class="erb-dot" style="background:${r.color || CAT_COLORS[r.cat] || '#1565C0'}"></span>
+                <div class="erb-info">
+                  <span class="erb-title">${CAT_ICONS[r.cat] || '📌'} ${esc(r.title)}</span>
+                  <span class="erb-meta">${r.start}–${r.end} &bull; ${r.freq === 'weekly' ? (r.days||[]).map(d => dayNames[d]).join(', ') : r.freq}</span>
+                </div>
+                <button class="erb-edit-btn" title="Edit this routine class"><i class="fas fa-edit"></i> Edit</button>
+              </div>
+            `).join('')}
+          </div>
+          <div class="erb-actions">
+            ${nextDateWithClass ? `
+              <button class="btn-primary btn-sm" onclick="goToDate('${nextDateWithClass}')">
+                <i class="fas fa-arrow-right"></i> View Next Class: ${esc(nextClassTitle)} (${formatDateShort(nextDateWithClass)})
+              </button>
+            ` : ''}
+            <button class="btn-secondary btn-sm" onclick="renderRecurringList(); openModal('recurringModal');">
+              <i class="fas fa-sliders-h"></i> Manage Routine Classes
+            </button>
+          </div>
+        </div>`;
+    }
+
+    list.innerHTML = `
+      <div class="empty-state">
+        <i class="fas fa-calendar-day"></i>
+        <p>No classes scheduled for <b>${formatDateLong(currentDate)}</b>.</p>
+        ${routineHtml}
+      </div>`;
     return;
   }
   list.innerHTML = events.map(ev => `
@@ -898,6 +1008,7 @@ function renderWeek() {
 
 function goToDateAndEdit(dateStr,eventId){currentDate=dateStr;document.getElementById('dayPicker').value=currentDate;switchView('dashboard');refreshAll();setTimeout(()=>editEvent(eventId),300);}
 function goToDateAndAdd(dateStr){currentDate=dateStr;document.getElementById('dayPicker').value=currentDate;switchView('dashboard');refreshAll();setTimeout(()=>openAddEventModal(dateStr),200);}
+function goToDate(dateStr){if(!dateStr)return;currentDate=dateStr;const dp=document.getElementById('dayPicker');if(dp)dp.value=currentDate;switchView('dashboard');refreshAll();}
 
 // ══════════════════════════════════════════
 // MONTH VIEW
@@ -1258,7 +1369,7 @@ function initPWA(){
     }).catch(()=>{});
     if ('caches' in window) {
       caches.keys().then(keys => {
-        keys.forEach(k => { if (k !== 'ib-planner-v5') caches.delete(k); });
+        keys.forEach(k => { if (k !== 'ib-planner-v7') caches.delete(k); });
       });
     }
   }
@@ -1322,6 +1433,9 @@ function exportData(){
 // MODALS
 // ══════════════════════════════════════════
 function openModal(id){
+  if (id === 'recurringModal') {
+    renderRecurringList();
+  }
   const el = document.getElementById(id);
   if (el) el.classList.add('open');
 }

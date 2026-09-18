@@ -662,6 +662,7 @@ async function signIn() {
     let displayName = user.displayName || rawUser;
     let role        = 'student';
     let realEmail   = user.email || (rawUser.includes('@') ? rawUser : '');
+    let username    = rawUser.includes('@') ? '' : rawUser;
 
     try {
       const doc = await firebase.firestore().collection('users').doc(user.uid).get();
@@ -670,14 +671,21 @@ async function signIn() {
         displayName = data.displayName || displayName;
         role        = data.role || role;
         realEmail   = data.email || realEmail;
+        if (data.username) {
+          username = data.username;
+        }
       }
     } catch (e) {
       console.warn('Firestore profile load note:', e);
     }
 
+    if (!username) {
+      username = (realEmail ? realEmail.split('@')[0] : (displayName || 'user')).toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    }
+
     const session = JSON.stringify({
       uid: user.uid,
-      username: rawUser.includes('@') ? (displayName || rawUser.split('@')[0]) : rawUser,
+      username: username,
       email: realEmail,
       displayName: displayName,
       role: role

@@ -14,7 +14,7 @@
   <link rel="manifest" href="manifest.json"/>
   <link rel="apple-touch-icon" href="icon-192.svg"/>
 
-  <link rel="stylesheet" href="style.css?v=6"/>
+  <link rel="stylesheet" href="style.css?v=7"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
 </head>
 <body>
@@ -101,7 +101,7 @@
         <button class="ud-item" onclick="openModal('settingsModal'); closeUserDropdown();">
           <i class="fas fa-cog"></i> <span>Settings</span>
         </button>
-        <button class="ud-item" onclick="openModal('recurringModal'); closeUserDropdown();">
+        <button class="ud-item" onclick="renderRecurringList(); openModal('recurringModal'); closeUserDropdown();">
           <i class="fas fa-redo"></i> <span>Routine Classes</span>
         </button>
         <button class="ud-item" onclick="window.print(); closeUserDropdown();">
@@ -190,6 +190,7 @@
               <option value="personal">Personal</option>
               <option value="travel">Travel</option>
             </select>
+            <button class="btn-secondary" onclick="renderRecurringList(); openModal('recurringModal')"><i class="fas fa-redo"></i> Routine Classes</button>
             <button class="btn-primary" onclick="openAddEventModal()"><i class="fas fa-plus"></i> Add Event</button>
           </div>
         </div>
@@ -822,7 +823,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js?v=6"></script>
-<script src="app.js?v=6"></script>
+<script src="firebase-config.js?v=7"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>
