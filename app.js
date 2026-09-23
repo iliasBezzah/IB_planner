@@ -1669,18 +1669,305 @@ function editCurrentCourseSchedule() {
   }
 }
 
+// ══════════════════════════════════════════
+// IN-APP NOTIFICATION CENTER
+// ══════════════════════════════════════════
+let readNotificationIds = [];
+try {
+  readNotificationIds = JSON.parse(localStorage.getItem('ib_read_notifs') || '[]');
+} catch(e) { readNotificationIds = []; }
+
+function toggleNotificationCenter(e) {
+  if (e) e.stopPropagation();
+  closeUserDropdown();
+  const container = document.getElementById('notifMenuContainer');
+  if (container) {
+    const wasOpen = container.classList.contains('open');
+    container.classList.toggle('open');
+    if (!wasOpen) {
+      updateNotificationCenter();
+    }
+  }
+}
+
+function closeNotificationCenter() {
+  const container = document.getElementById('notifMenuContainer');
+  if (container) container.classList.remove('open');
+}
+
+function markAllNotificationsRead() {
+  const allNotifs = collectAllActivityNotifications();
+  readNotificationIds = allNotifs.map(n => n.id);
+  try {
+    localStorage.setItem('ib_read_notifs', JSON.stringify(readNotificationIds));
+  } catch(e) {}
+  updateNotificationCenter();
+  showToast('✅ All notifications marked as read.');
+}
+
+function formatTimeAgo(ts) {
+  if (!ts) return '';
+  const now = Date.now();
+  const diffSec = Math.floor((now - ts) / 1000);
+  if (diffSec < 60) return 'Just now';
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `${diffH}h ago`;
+  const diffDays = Math.floor(diffH / 24);
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
+function collectAllActivityNotifications() {
+  const list = [];
+  const curUser = getCurrentUser() || CURRENT_USER || {};
+  const myName = curUser.displayName || curUser.username || '';
+
+  const seenIds = new Set();
+  const projectsToScan = Object.values(sharedProjects);
+  (globalData.recurring || []).forEach(c => {
+    if (c.project && !sharedProjects[c.project.id]) {
+      projectsToScan.push(c.project);
+    }
+  });
+
+  projectsToScan.forEach(proj => {
+    (proj.activity || []).forEach(act => {
+      if (act && act.id && !seenIds.has(act.id)) {
+        seenIds.add(act.id);
+        list.push({
+          id: act.id,
+          projectId: proj.id,
+          courseId: proj.courseId,
+          courseTitle: proj.courseTitle || proj.title,
+          projectTitle: proj.title,
+          type: act.type || 'activity',
+          text: act.text,
+          byUser: act.byUser,
+          isSelf: act.byUser === myName,
+          timestamp: act.timestamp || Date.now()
+        });
+      }
+    });
+  });
+
+  return list.sort((a, b) => b.timestamp - a.timestamp);
+}
+
+function updateNotificationCenter() {
+  const badge = document.getElementById('notifCounterBadge');
+  const body = document.getElementById('notifDropdownBody');
+  if (!body) return;
+
+  const notifs = collectAllActivityNotifications();
+  const unreadNotifs = notifs.filter(n => !readNotificationIds.includes(n.id) && !n.isSelf);
+
+  if (badge) {
+    if (unreadNotifs.length > 0) {
+      badge.textContent = unreadNotifs.length > 9 ? '9+' : unreadNotifs.length;
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  }
+
+  if (notifs.length === 0) {
+    body.innerHTML = `
+      <div class="notif-empty">
+        <i class="fas fa-check-circle"></i>
+        <span>No project activity yet</span>
+        <small style="opacity:0.7">Collaborator updates &amp; milestones will appear here</small>
+      </div>`;
+    return;
+  }
+
+  body.innerHTML = notifs.slice(0, 20).map(n => {
+    const isUnread = !readNotificationIds.includes(n.id) && !n.isSelf;
+    let iconClass = 'fas fa-info-circle';
+    let iconMod = '';
+
+    if (n.type === 'milestone_completed') {
+      iconClass = 'fas fa-check-circle';
+      iconMod = 'done';
+    } else if (n.type === 'deadline_updated') {
+      iconClass = 'fas fa-stopwatch';
+      iconMod = 'deadline';
+    } else if (n.type === 'member_invited') {
+      iconClass = 'fas fa-user-plus';
+      iconMod = 'invite';
+    } else if (n.type === 'milestone_reopened') {
+      iconClass = 'fas fa-undo';
+    }
+
+    return `
+      <div class="notif-item ${isUnread ? 'unread' : ''}" onclick="onNotificationItemClick('${n.projectId}', '${n.courseId}')">
+        <div class="notif-item-icon ${iconMod}"><i class="${iconClass}"></i></div>
+        <div class="notif-item-content">
+          <div class="notif-item-title">${esc(n.courseTitle || n.projectTitle)}</div>
+          <div class="notif-item-text">${esc(n.text)}</div>
+          <div class="notif-item-time"><i class="far fa-clock"></i> ${formatTimeAgo(n.timestamp)}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function onNotificationItemClick(projectId, courseId) {
+  closeNotificationCenter();
+  let targetCourseId = courseId;
+  if (!targetCourseId) {
+    const found = (globalData.recurring || []).find(c => c.project?.id === projectId || c.projectId === projectId);
+    if (found) targetCourseId = found.id;
+  }
+  if (targetCourseId) {
+    openCourseDetails(targetCourseId);
+    switchCourseTab('project');
+  }
+}
+
+// ══════════════════════════════════════════
+// REAL-TIME SHARED PROJECTS (FIRESTORE 'projects')
+// ══════════════════════════════════════════
+let projectsUnsubscribe = null;
+const sharedProjects = {};
+
+function initProjectsRealtimeSync() {
+  const user = getCurrentUser() || CURRENT_USER;
+  if (!user || !user.uid || typeof firebase === 'undefined' || !firebase.apps.length) return;
+
+  if (projectsUnsubscribe) {
+    try { projectsUnsubscribe(); } catch(e){}
+    projectsUnsubscribe = null;
+  }
+
+  try {
+    const dbFs = firebase.firestore();
+    projectsUnsubscribe = dbFs.collection('projects')
+      .where('assignedUsers', 'array-contains', user.uid)
+      .onSnapshot(snapshot => {
+        snapshot.docChanges().forEach(change => {
+          const proj = change.doc.data();
+          if (change.type === 'removed') {
+            delete sharedProjects[proj.id];
+            (globalData.recurring || []).forEach(c => {
+              if (c.project?.id === proj.id) c.project = null;
+            });
+          } else {
+            const prev = sharedProjects[proj.id];
+            const isUpdated = prev && prev.updatedAt !== proj.updatedAt;
+            sharedProjects[proj.id] = proj;
+
+            linkSharedProjectToCourses(proj);
+
+            if (isUpdated && change.type === 'modified') {
+              const lastAct = proj.activity && proj.activity.length ? proj.activity[proj.activity.length - 1] : null;
+              const myName = user.displayName || user.username || '';
+              if (lastAct && lastAct.byUser !== myName) {
+                playNotificationChime();
+                showToast(`🔔 [${proj.title}] ${lastAct.text}`, 4000);
+              }
+            }
+          }
+        });
+
+        if (currentActiveCourseId) {
+          const course = getCourseById(currentActiveCourseId);
+          if (course) {
+            renderCourseProject(course);
+          }
+        }
+
+        updateNotificationCenter();
+        save();
+      }, err => {
+        console.warn('Real-time projects listener note (offline mode active):', err);
+      });
+  } catch(e) {
+    console.warn('initProjectsRealtimeSync error:', e);
+  }
+}
+
+function linkSharedProjectToCourses(proj) {
+  if (!proj || !proj.id) return;
+  let linked = false;
+  (globalData.recurring || []).forEach(c => {
+    if (c.project?.id === proj.id || c.projectId === proj.id || (proj.courseTitle && c.title.toLowerCase() === proj.courseTitle.toLowerCase())) {
+      c.project = proj;
+      c.projectId = proj.id;
+      linked = true;
+    }
+  });
+
+  if (!linked && proj.courseTitle) {
+    const newCourse = {
+      id: proj.courseId || uid(),
+      title: proj.courseTitle,
+      start: '09:00',
+      end: '10:30',
+      cat: 'group',
+      color: '#1565C0',
+      location: 'Shared Collaboration',
+      priority: 'normal',
+      reminder: 15,
+      freq: 'weekly',
+      days: [1],
+      startDate: todayStr(),
+      courseNotes: [],
+      assignments: [],
+      projectId: proj.id,
+      project: proj
+    };
+    if (!Array.isArray(globalData.recurring)) globalData.recurring = [];
+    globalData.recurring.push(newCourse);
+    save();
+    refreshAll();
+  }
+}
+
+async function syncProjectToFirestore(proj) {
+  if (!proj || !proj.id) return;
+  if (typeof firebase !== 'undefined' && firebase.apps.length) {
+    try {
+      await firebase.firestore().collection('projects').doc(proj.id).set(proj, { merge: true });
+    } catch(e) {
+      console.warn('Firestore project sync note (cached locally):', e);
+    }
+  }
+}
+
+function logProjectActivity(proj, text, type = 'activity') {
+  if (!proj) return;
+  if (!Array.isArray(proj.activity)) proj.activity = [];
+  const curUser = getCurrentUser() || CURRENT_USER || {};
+  proj.activity.push({
+    id: uid(),
+    type,
+    text,
+    byUser: curUser.displayName || curUser.username || 'User',
+    timestamp: Date.now()
+  });
+  proj.updatedAt = new Date().toISOString();
+}
+
 // ── Course Project Tracker ──
 function renderCourseProject(course) {
   const container = document.getElementById('cdProjectContainer');
   if (!container) return;
-  const p = course.project;
+
+  // Check if we have shared live project in sharedProjects
+  let p = course.project;
+  if (course.projectId && sharedProjects[course.projectId]) {
+    p = sharedProjects[course.projectId];
+    course.project = p;
+  }
 
   if (!p) {
     container.innerHTML = `
       <div class="cd-empty-project">
         <i class="fas fa-project-diagram"></i>
         <h4>No Project Assigned Yet</h4>
-        <p>Track term projects, group assignments, milestones, and collaborate with your classmates.</p>
+        <p>Set up term projects, milestone checklists, and collaborate with your classmates in real time.</p>
         <button class="btn-primary" onclick="openProjectModal(false)">
           <i class="fas fa-plus"></i> Set Up Course Project
         </button>
@@ -1718,6 +2005,10 @@ function renderCourseProject(course) {
   else if (p.notificationFrequency === 'custom') freqLabel = `Every ${p.customIntervalDays || 3} days`;
 
   const members = p.members || [];
+  const curUser = getCurrentUser() || CURRENT_USER || {};
+  const isOwner = !p.ownerUid || p.ownerUid === curUser.uid;
+
+  const activities = (p.activity || []).slice(-5).reverse();
 
   container.innerHTML = `
     <div class="cd-proj-card">
@@ -1727,19 +2018,19 @@ function renderCourseProject(course) {
           ${p.description ? `<p class="cd-proj-desc">${esc(p.description)}</p>` : ''}
         </div>
         <div class="cd-proj-actions">
-          <button class="btn-secondary btn-sm" onclick="openProjectModal(true)" title="Edit project details and stages">
-            <i class="fas fa-edit"></i> Edit
+          <button class="btn-secondary btn-sm" onclick="openProjectModal(true)" title="Edit project & invite team members">
+            <i class="fas fa-user-plus"></i> Edit &amp; Invite
           </button>
-          <button class="btn-secondary btn-sm" style="color:var(--danger)" onclick="deleteCourseProject()" title="Delete project">
-            <i class="fas fa-trash"></i>
+          <button class="btn-secondary btn-sm" style="color:var(--danger)" onclick="deleteCourseProject()" title="${isOwner ? 'Delete project' : 'Leave project'}">
+            <i class="fas fa-${isOwner ? 'trash' : 'sign-out-alt'}"></i> ${isOwner ? 'Delete' : 'Leave'}
           </button>
         </div>
       </div>
 
-      <!-- Progress Bar -->
+      <!-- Real-Time Progress Bar -->
       <div class="cd-progress-container">
         <div class="cd-progress-info">
-          <span><i class="fas fa-chart-line"></i> Overall Project Progress</span>
+          <span><i class="fas fa-chart-line"></i> Multi-User Project Progress</span>
           <span class="cd-progress-pct">${pct}% (${completedStages}/${stages.length} milestones)</span>
         </div>
         <div class="cd-progress-track">
@@ -1755,14 +2046,24 @@ function renderCourseProject(course) {
         </div>
       </div>
 
-      <!-- Milestones / Stages Checklist -->
+      <!-- Milestones / Stages Checklist with Member Assignee Badges -->
       <div>
-        <div class="cd-stages-header"><i class="fas fa-check-square"></i> Project Milestones &amp; Stages:</div>
+        <div class="cd-stages-header"><i class="fas fa-check-square"></i> Project Milestones &amp; Assigned Members:</div>
         <div class="cd-stages-list">
           ${stages.length ? stages.map((s, idx) => `
             <div class="cd-stage-item ${s.done ? 'done' : ''}" onclick="toggleCourseProjectStage(${idx})">
               <div class="cd-stage-check">${s.done ? '<i class="fas fa-check"></i>' : ''}</div>
               <span class="cd-stage-text">${esc(s.title)}</span>
+              ${s.assignedName ? `
+                <span class="cd-stage-assignee" title="Assigned to ${esc(s.assignedName)}">
+                  <span class="cd-stage-assignee-av">${(s.assignedName || 'M').charAt(0).toUpperCase()}</span>
+                  <span>${esc(s.assignedName)}</span>
+                </span>
+              ` : `
+                <span class="cd-stage-assignee unassigned" onclick="event.stopPropagation(); promptAssignStage(${idx})" title="Click to assign member">
+                  <i class="fas fa-user-plus"></i> Assign
+                </span>
+              `}
             </div>
           `).join('') : '<div style="font-size:12px;color:var(--text-light);padding:8px 0;">No stages added yet. Edit project to add milestone stages.</div>'}
         </div>
@@ -1770,20 +2071,83 @@ function renderCourseProject(course) {
 
       <!-- Collaborators & Team Members -->
       <div class="cd-collaborators-wrap">
-        <div class="cd-collab-title"><i class="fas fa-users"></i> Assigned Collaborating Team Members:</div>
+        <div class="cd-collab-title">
+          <i class="fas fa-users"></i> Project Team Members (${members.length}):
+        </div>
         <div class="cd-members-chips">
           ${members.length ? members.map(m => {
             const initial = (m.name || 'M').charAt(0).toUpperCase();
             return `
-              <div class="cd-member-chip">
+              <div class="cd-member-chip" title="${m.username ? '@' + m.username : m.email}">
                 <div class="cd-member-av">${initial}</div>
-                <span class="cd-member-name">${esc(m.name)}</span>
-                ${m.role ? `<span class="cd-member-role">${esc(m.role)}</span>` : ''}
+                <div>
+                  <span class="cd-member-name">${esc(m.name)}</span>
+                  ${m.role ? `<span class="cd-member-role">${esc(m.role)}</span>` : ''}
+                </div>
               </div>`;
-          }).join('') : '<span style="font-size:12px;color:var(--text-light);">No team members assigned yet. Click Edit to add collaborators.</span>'}
+          }).join('') : '<span style="font-size:12px;color:var(--text-light);">No team members yet. Click Edit &amp; Invite to add collaborators.</span>'}
         </div>
       </div>
+
+      <!-- Real-time Activity Stream -->
+      ${activities.length ? `
+        <div class="cd-activity-box">
+          <div class="cd-activity-header"><i class="fas fa-history"></i> Recent Project Activity:</div>
+          <div class="cd-activity-list">
+            ${activities.map(a => `
+              <div class="cd-activity-item">
+                <i class="fas fa-${a.type === 'milestone_completed' ? 'check-circle' : (a.type === 'member_invited' ? 'user-plus' : 'dot-circle')}" style="color:var(--primary);font-size:10px"></i>
+                <span>${esc(a.text)}</span>
+                <span class="cd-activity-time">${formatTimeAgo(a.timestamp)}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+
     </div>`;
+}
+
+function promptAssignStage(idx) {
+  const course = getCourseById(currentActiveCourseId);
+  if (!course || !course.project || !course.project.stages) return;
+  const p = course.project;
+  const stg = p.stages[idx];
+  if (!stg) return;
+
+  const members = p.members || [];
+  if (members.length === 0) {
+    showToast('⚠️ No collaborators on this project yet. Click Edit & Invite to add team members.');
+    return;
+  }
+
+  const optionsStr = members.map((m, i) => `${i + 1}. ${m.name} (${m.role || 'Member'})`).join('\n');
+  const input = prompt(`Assign milestone "${stg.title}" to:\n\n${optionsStr}\n0. Unassign\n\nEnter number:`);
+  if (input === null) return;
+  const choice = parseInt(input.trim());
+  if (isNaN(choice)) return;
+
+  const curUser = getCurrentUser() || CURRENT_USER || {};
+  const actor = curUser.displayName || curUser.username || 'Owner';
+
+  if (choice === 0) {
+    stg.assignedTo = '';
+    stg.assignedName = '';
+    stg.assignedUid = '';
+    logProjectActivity(p, `${actor} unassigned milestone "${stg.title}"`);
+  } else if (choice >= 1 && choice <= members.length) {
+    const sel = members[choice - 1];
+    stg.assignedTo = sel.username || sel.name;
+    stg.assignedName = sel.name;
+    stg.assignedUid = sel.uid || '';
+    logProjectActivity(p, `${actor} assigned milestone "${stg.title}" to ${sel.name}`);
+  }
+
+  p.updatedAt = new Date().toISOString();
+  syncProjectToFirestore(p);
+  save();
+  renderCourseProject(course);
+  showToast('Milestone assigned.');
 }
 
 function openProjectModal(isEdit) {
@@ -1791,10 +2155,13 @@ function openProjectModal(isEdit) {
   if (!course) return;
 
   document.getElementById('projCourseId').value = course.id;
-  const p = isEdit && course.project ? course.project : null;
+  let p = isEdit && course.project ? course.project : null;
+  if (isEdit && course.projectId && sharedProjects[course.projectId]) {
+    p = sharedProjects[course.projectId];
+  }
 
   document.getElementById('projModalTitle').innerHTML = p
-    ? '<i class="fas fa-edit"></i> Edit Course Project'
+    ? '<i class="fas fa-edit"></i> Edit Course Project &amp; Team'
     : '<i class="fas fa-project-diagram"></i> Set Up Course Project';
 
   document.getElementById('projTitle').value = p ? p.title : '';
@@ -1811,19 +2178,34 @@ function openProjectModal(isEdit) {
 
   const stageList = document.getElementById('stageBuilderList');
   if (stageList) stageList.innerHTML = '';
+
   const memberList = document.getElementById('membersBuilderList');
   if (memberList) memberList.innerHTML = '';
 
-  if (p && Array.isArray(p.stages) && p.stages.length) {
-    p.stages.forEach(s => addStageToBuilder(s.title, s.done));
-  } else if (!p) {
-    addStageToBuilder('Topic proposal & requirements', false);
-    addStageToBuilder('Core development & analysis', false);
-    addStageToBuilder('Final presentation & report submission', false);
+  const curUser = getCurrentUser() || CURRENT_USER || {};
+
+  // Ensure project owner is present in members
+  if (p && Array.isArray(p.members) && p.members.length) {
+    p.members.forEach(m => addMemberToBuilder(m.name, m.role, m.username, m.uid, m.status || (m.uid === p.ownerUid ? 'owner' : 'collaborator')));
+  } else {
+    // Current user is initial owner
+    addMemberToBuilder(
+      curUser.displayName || curUser.username || 'You',
+      'Lead',
+      curUser.username || '',
+      curUser.uid || '',
+      'owner'
+    );
   }
 
-  if (p && Array.isArray(p.members) && p.members.length) {
-    p.members.forEach(m => addMemberToBuilder(m.name, m.role));
+  updateStageAssigneeDropdown();
+
+  if (p && Array.isArray(p.stages) && p.stages.length) {
+    p.stages.forEach(s => addStageToBuilder(s.title, s.done, s.assignedTo, s.assignedName, s.assignedUid));
+  } else if (!p) {
+    addStageToBuilder('Topic proposal & requirements', false, curUser.username, curUser.displayName || 'You', curUser.uid);
+    addStageToBuilder('Core development & analysis', false);
+    addStageToBuilder('Final presentation & report submission', false);
   }
 
   const pillsEl = document.getElementById('quickContactsPills');
@@ -1836,11 +2218,39 @@ function openProjectModal(isEdit) {
         </button>
       `).join('');
     } else {
-      pillsEl.innerHTML = '<span style="font-size:11px;color:var(--text-light)">No saved contacts found. Add teammates above.</span>';
+      pillsEl.innerHTML = '<span style="font-size:11px;color:var(--text-light)">Enter registered usernames or emails above to invite.</span>';
     }
   }
 
+  const feedbackEl = document.getElementById('inviteFeedback');
+  if (feedbackEl) feedbackEl.classList.add('hidden');
+  const invInput = document.getElementById('inviteUserInput');
+  if (invInput) invInput.value = '';
+
   openModal('courseProjectModal');
+}
+
+function updateStageAssigneeDropdown() {
+  const sel = document.getElementById('newStageAssignee');
+  if (!sel) return;
+  const currentVal = sel.value;
+  sel.innerHTML = '<option value="">👤 Unassigned</option>';
+
+  document.querySelectorAll('#membersBuilderList .builder-item').forEach(item => {
+    const uidVal = item.dataset.uid || '';
+    const username = item.dataset.username || '';
+    const name = item.dataset.name || '';
+    if (name) {
+      const opt = document.createElement('option');
+      opt.value = uidVal || username || name;
+      opt.dataset.name = name;
+      opt.dataset.username = username;
+      opt.dataset.uid = uidVal;
+      opt.textContent = `👤 ${name}`;
+      if (opt.value === currentVal) opt.selected = true;
+      sel.appendChild(opt);
+    }
+  });
 }
 
 function toggleCustomFreqInput() {
@@ -1851,51 +2261,196 @@ function toggleCustomFreqInput() {
   }
 }
 
-function addStageToBuilder(title = '', done = false) {
+function addStageToBuilder(title = '', done = false, assignedTo = '', assignedName = '', assignedUid = '') {
   const list = document.getElementById('stageBuilderList');
   if (!list) return;
   const input = document.getElementById('newStageInput');
   const stageTitle = title || (input ? input.value.trim() : '');
   if (!stageTitle) return;
 
+  const assigneeSel = document.getElementById('newStageAssignee');
+  let finalAssignedTo = assignedTo;
+  let finalAssignedName = assignedName;
+  let finalAssignedUid = assignedUid;
+
+  if (!title && assigneeSel && assigneeSel.selectedIndex > 0) {
+    const selectedOpt = assigneeSel.options[assigneeSel.selectedIndex];
+    finalAssignedTo = selectedOpt.dataset.username || selectedOpt.value;
+    finalAssignedName = selectedOpt.dataset.name || selectedOpt.textContent.replace('👤 ', '');
+    finalAssignedUid = selectedOpt.dataset.uid || '';
+  }
+
   const item = document.createElement('div');
   item.className = 'builder-item';
+  item.dataset.assignedTo = finalAssignedTo || '';
+  item.dataset.assignedName = finalAssignedName || '';
+  item.dataset.assignedUid = finalAssignedUid || '';
+
   item.innerHTML = `
-    <span style="display:flex;align-items:center;gap:8px">
-      <input type="checkbox" class="builder-stage-done" ${done ? 'checked' : ''} style="width:15px;height:15px;cursor:pointer;"/>
-      <span class="builder-stage-text">${esc(stageTitle)}</span>
+    <span style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
+      <input type="checkbox" class="builder-stage-done" ${done ? 'checked' : ''} style="width:15px;height:15px;cursor:pointer;flex-shrink:0"/>
+      <span class="builder-stage-text" style="overflow:hidden;text-overflow:ellipsis">${esc(stageTitle)}</span>
+      <span class="cd-stage-assignee ${finalAssignedName ? '' : 'unassigned'}" style="margin-left:auto;flex-shrink:0">
+        ${finalAssignedName ? `
+          <span class="cd-stage-assignee-av">${finalAssignedName.charAt(0).toUpperCase()}</span>
+          <span>${esc(finalAssignedName)}</span>
+        ` : 'Unassigned'}
+      </span>
     </span>
-    <button type="button" class="btn-secondary btn-sm" style="padding:2px 8px;color:var(--danger)" onclick="this.closest('.builder-item').remove()"><i class="fas fa-trash"></i></button>
+    <button type="button" class="btn-secondary btn-sm" style="padding:2px 8px;color:var(--danger);flex-shrink:0" onclick="this.closest('.builder-item').remove()"><i class="fas fa-trash"></i></button>
   `;
   list.appendChild(item);
   if (input && !title) input.value = '';
 }
 
-function addMemberToBuilder(name = '', role = '') {
+function addMemberToBuilder(name = '', role = '', username = '', uidVal = '', status = 'collaborator') {
   const list = document.getElementById('membersBuilderList');
   if (!list) return;
-  const nameInp = document.getElementById('newMemberName');
-  const roleInp = document.getElementById('newMemberRole');
-  const memberName = name || (nameInp ? nameInp.value.trim() : '');
-  const memberRole = role || (roleInp ? roleInp.value.trim() : 'Member');
+  const memberName = name.trim();
+  const memberRole = role || 'Collaborator';
   if (!memberName) return;
+
+  const curUser = getCurrentUser() || CURRENT_USER || {};
+  const isOwner = status === 'owner' || uidVal === curUser.uid;
 
   const item = document.createElement('div');
   item.className = 'builder-item';
+  item.dataset.uid = uidVal || '';
+  item.dataset.username = username || '';
+  item.dataset.name = memberName;
+  item.dataset.role = memberRole;
+  item.dataset.status = status;
+
+  const initial = memberName.charAt(0).toUpperCase();
+
   item.innerHTML = `
-    <span style="display:flex;align-items:center;gap:8px">
-      <i class="fas fa-user-circle" style="color:var(--primary);font-size:14px"></i>
-      <strong class="builder-member-name">${esc(memberName)}</strong>
-      <span class="builder-member-role" style="color:var(--text-light);font-size:11px">(${esc(memberRole)})</span>
+    <span style="display:flex;align-items:center;gap:8px;flex:1">
+      <div class="cd-member-av" style="width:24px;height:24px;font-size:10px">${initial}</div>
+      <div>
+        <strong class="builder-member-name">${esc(memberName)}</strong>
+        ${username ? `<small style="color:var(--text-light);margin-left:4px">@${esc(username)}</small>` : ''}
+        <span class="builder-member-role" style="color:var(--text-light);font-size:11px;margin-left:4px">(${esc(memberRole)})</span>
+        <span class="member-status-pill ${status}">${status}</span>
+      </div>
     </span>
-    <button type="button" class="btn-secondary btn-sm" style="padding:2px 8px;color:var(--danger)" onclick="this.closest('.builder-item').remove()"><i class="fas fa-trash"></i></button>
+    ${!isOwner ? `
+      <button type="button" class="btn-secondary btn-sm" style="padding:2px 8px;color:var(--danger)" onclick="this.closest('.builder-item').remove(); updateStageAssigneeDropdown();">
+        <i class="fas fa-times"></i>
+      </button>
+    ` : '<span style="font-size:11px;color:var(--primary);font-weight:700">Project Lead</span>'}
   `;
   list.appendChild(item);
-  if (nameInp && !name) nameInp.value = '';
-  if (roleInp && !role) roleInp.value = '';
+  updateStageAssigneeDropdown();
 }
 
-function saveCourseProject() {
+async function inviteUserToProject() {
+  const inputEl = document.getElementById('inviteUserInput');
+  const roleEl = document.getElementById('inviteUserRole');
+  const feedbackEl = document.getElementById('inviteFeedback');
+  const btn = document.getElementById('btnInviteUser');
+
+  const query = (inputEl?.value || '').trim();
+  const role = roleEl?.value || 'Collaborator';
+
+  if (!query) {
+    showToast('⚠️ Please enter a username or email address.');
+    return;
+  }
+
+  if (feedbackEl) {
+    feedbackEl.className = 'invite-feedback';
+    feedbackEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Searching for registered user…';
+    feedbackEl.classList.remove('hidden');
+  }
+  if (btn) btn.disabled = true;
+
+  try {
+    const clean = query.toLowerCase();
+    let foundUser = null;
+
+    if (typeof firebase !== 'undefined' && firebase.apps.length) {
+      const dbFs = firebase.firestore();
+      if (clean.includes('@')) {
+        const snap = await dbFs.collection('users').where('email', '==', clean).limit(1).get();
+        if (!snap.empty) {
+          const d = snap.docs[0];
+          foundUser = { uid: d.id, ...d.data() };
+        }
+      } else {
+        const uDoc = await dbFs.collection('usernames').doc(clean).get();
+        if (uDoc.exists) {
+          const uData = uDoc.data();
+          const userDoc = await dbFs.collection('users').doc(uData.uid).get();
+          if (userDoc.exists) {
+            foundUser = { uid: uData.uid, ...userDoc.data() };
+          } else {
+            foundUser = { uid: uData.uid, username: clean, email: uData.email, displayName: clean };
+          }
+        }
+      }
+    }
+
+    if (!foundUser) {
+      if (feedbackEl) {
+        feedbackEl.className = 'invite-feedback error';
+        feedbackEl.innerHTML = `<i class="fas fa-times-circle"></i> User "<b>${esc(query)}</b>" was not found in registered accounts.`;
+      }
+      showToast(`⚠️ User "${query}" not found.`);
+      return;
+    }
+
+    const curUser = getCurrentUser() || CURRENT_USER || {};
+    if (foundUser.uid === curUser.uid) {
+      if (feedbackEl) {
+        feedbackEl.className = 'invite-feedback error';
+        feedbackEl.innerHTML = `<i class="fas fa-info-circle"></i> You are already the project lead!`;
+      }
+      return;
+    }
+
+    // Check if already in builder list
+    let alreadyExists = false;
+    document.querySelectorAll('#membersBuilderList .builder-item').forEach(item => {
+      if (item.dataset.uid === foundUser.uid || item.dataset.username === foundUser.username) {
+        alreadyExists = true;
+      }
+    });
+
+    if (alreadyExists) {
+      if (feedbackEl) {
+        feedbackEl.className = 'invite-feedback error';
+        feedbackEl.innerHTML = `<i class="fas fa-check-circle"></i> <b>${esc(foundUser.displayName || foundUser.username)}</b> is already in this project.`;
+      }
+      return;
+    }
+
+    addMemberToBuilder(
+      foundUser.displayName || foundUser.username,
+      role,
+      foundUser.username || clean,
+      foundUser.uid,
+      'collaborator'
+    );
+
+    if (feedbackEl) {
+      feedbackEl.className = 'invite-feedback success';
+      feedbackEl.innerHTML = `<i class="fas fa-check-circle"></i> Added <b>${esc(foundUser.displayName || foundUser.username)}</b> (${esc(role)}) to team!`;
+    }
+    if (inputEl) inputEl.value = '';
+    showToast(`🎉 ${foundUser.displayName || foundUser.username} added! Click Save Project to sync.`);
+
+  } catch(err) {
+    console.error('Invite error:', err);
+    if (feedbackEl) {
+      feedbackEl.className = 'invite-feedback error';
+      feedbackEl.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Lookup failed: ${esc(err.message)}`;
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function saveCourseProject() {
   const course = getCourseById(currentActiveCourseId);
   if (!course) return;
 
@@ -1915,58 +2470,158 @@ function saveCourseProject() {
     const textEl = item.querySelector('.builder-stage-text');
     const cb = item.querySelector('.builder-stage-done');
     if (textEl) {
-      stages.push({ title: textEl.textContent.trim(), done: cb ? cb.checked : false });
+      stages.push({
+        id: item.dataset.stageId || uid(),
+        title: textEl.textContent.trim(),
+        done: cb ? cb.checked : false,
+        assignedTo: item.dataset.assignedTo || '',
+        assignedName: item.dataset.assignedName || '',
+        assignedUid: item.dataset.assignedUid || ''
+      });
     }
   });
 
+  const curUser = getCurrentUser() || CURRENT_USER || {};
   const members = [];
+  const assignedUsersSet = new Set();
+  if (curUser.uid) assignedUsersSet.add(curUser.uid);
+
   document.querySelectorAll('#membersBuilderList .builder-item').forEach(item => {
-    const nameEl = item.querySelector('.builder-member-name');
-    const roleEl = item.querySelector('.builder-member-role');
-    if (nameEl) {
-      const rawRole = roleEl ? roleEl.textContent.replace(/[()]/g, '').trim() : 'Member';
-      members.push({ name: nameEl.textContent.trim(), role: rawRole });
+    const name = item.dataset.name || item.querySelector('.builder-member-name')?.textContent.trim();
+    const role = item.dataset.role || 'Collaborator';
+    const username = item.dataset.username || '';
+    const uidVal = item.dataset.uid || '';
+    const status = item.dataset.status || (uidVal === curUser.uid ? 'owner' : 'collaborator');
+
+    if (uidVal) assignedUsersSet.add(uidVal);
+    if (name) {
+      members.push({ uid: uidVal, username, name, role, status });
     }
   });
 
-  course.project = {
-    id: course.project?.id || uid(),
+  const existingProj = course.project || (course.projectId ? sharedProjects[course.projectId] : null);
+  const projId = existingProj?.id || uid();
+  const isNew = !existingProj;
+
+  const activity = existingProj?.activity || [];
+  const userName = curUser.displayName || curUser.username || 'Lead';
+
+  if (isNew) {
+    activity.push({
+      id: uid(),
+      type: 'created',
+      text: `${userName} created project "${title}"`,
+      byUser: userName,
+      timestamp: Date.now()
+    });
+  } else if (existingProj.deadlineDate !== deadlineDate) {
+    activity.push({
+      id: uid(),
+      type: 'deadline_updated',
+      text: `${userName} updated deadline to ${formatDateShort(deadlineDate)}`,
+      byUser: userName,
+      timestamp: Date.now()
+    });
+  }
+
+  const proj = {
+    id: projId,
+    courseId: course.id,
+    courseTitle: course.title,
     title,
     description: desc,
     deadlineDate,
     deadlineTime,
-    stages,
+    ownerUid: existingProj?.ownerUid || curUser.uid || '',
+    ownerUsername: existingProj?.ownerUsername || curUser.username || '',
+    ownerName: existingProj?.ownerName || curUser.displayName || curUser.username || 'Lead',
+    assignedUsers: Array.from(assignedUsersSet),
     members,
+    stages,
+    activity,
     notificationFrequency: freq,
     customIntervalDays: customDays,
     remindersEnabled,
-    lastNotified: course.project?.lastNotified || 0
+    lastNotified: existingProj?.lastNotified || 0,
+    updatedAt: new Date().toISOString()
   };
 
+  course.project = proj;
+  course.projectId = proj.id;
+  sharedProjects[proj.id] = proj;
+
+  // Real-time Firestore sync
+  await syncProjectToFirestore(proj);
+
   save();
   renderCourseProject(course);
+  updateNotificationCenter();
   closeModal('courseProjectModal');
-  showToast('🚀 Project updated!');
+  showToast('🚀 Project updated & synced live with team!');
 }
 
-function deleteCourseProject() {
+async function deleteCourseProject() {
   const course = getCourseById(currentActiveCourseId);
   if (!course || !course.project) return;
-  if (!confirm('Are you sure you want to delete this project?')) return;
-  course.project = null;
-  save();
-  renderCourseProject(course);
-  showToast('🗑️ Project removed.');
-}
+  const p = course.project;
+  const curUser = getCurrentUser() || CURRENT_USER || {};
+  const isOwner = !p.ownerUid || p.ownerUid === curUser.uid;
 
-function toggleCourseProjectStage(idx) {
-  const course = getCourseById(currentActiveCourseId);
-  if (!course || !course.project || !course.project.stages) return;
-  if (course.project.stages[idx]) {
-    course.project.stages[idx].done = !course.project.stages[idx].done;
+  if (isOwner) {
+    if (!confirm('Are you sure you want to delete this project for all collaborators?')) return;
+    if (typeof firebase !== 'undefined' && firebase.apps.length && p.id) {
+      try {
+        await firebase.firestore().collection('projects').doc(p.id).delete();
+      } catch(e) {
+        console.warn('Firestore project delete error:', e);
+      }
+    }
+    delete sharedProjects[p.id];
+    course.project = null;
+    course.projectId = null;
     save();
     renderCourseProject(course);
-    showToast(course.project.stages[idx].done ? '✅ Milestone completed!' : 'Milestone reopened.');
+    updateNotificationCenter();
+    showToast('🗑️ Project deleted.');
+  } else {
+    if (!confirm('Leave this shared project? You will no longer receive updates.')) return;
+    p.assignedUsers = (p.assignedUsers || []).filter(u => u !== curUser.uid);
+    p.members = (p.members || []).filter(m => m.uid !== curUser.uid && m.username !== curUser.username);
+    logProjectActivity(p, `${curUser.displayName || curUser.username || 'A member'} left the project`);
+    await syncProjectToFirestore(p);
+
+    delete sharedProjects[p.id];
+    course.project = null;
+    course.projectId = null;
+    save();
+    renderCourseProject(course);
+    updateNotificationCenter();
+    showToast('👋 You have left the project.');
+  }
+}
+
+async function toggleCourseProjectStage(idx) {
+  const course = getCourseById(currentActiveCourseId);
+  if (!course || !course.project || !course.project.stages) return;
+  const p = course.project;
+
+  if (p.stages[idx]) {
+    p.stages[idx].done = !p.stages[idx].done;
+    const isDone = p.stages[idx].done;
+    const curUser = getCurrentUser() || CURRENT_USER || {};
+    const actor = curUser.displayName || curUser.username || 'Teammate';
+
+    logProjectActivity(
+      p,
+      `${actor} ${isDone ? 'completed' : 'reopened'} milestone "${p.stages[idx].title}"`,
+      isDone ? 'milestone_completed' : 'milestone_reopened'
+    );
+
+    await syncProjectToFirestore(p);
+    save();
+    renderCourseProject(course);
+    updateNotificationCenter();
+    showToast(isDone ? '✅ Milestone completed!' : 'Milestone reopened.');
   }
 }
 
@@ -2270,7 +2925,7 @@ function initPWA(){
 
     if('caches' in window) {
       caches.keys().then(keys => {
-        keys.forEach(k => { if(k !== 'ib-planner-v8') caches.delete(k); });
+        keys.forEach(k => { if(k !== 'ib-planner-v9') caches.delete(k); });
       });
     }
   }
@@ -2502,6 +3157,10 @@ document.addEventListener('click', (e) => {
   if (container && !container.contains(e.target)) {
     container.classList.remove('open');
   }
+  const notifContainer = document.getElementById('notifMenuContainer');
+  if (notifContainer && !notifContainer.contains(e.target)) {
+    notifContainer.classList.remove('open');
+  }
 });
 
 function logout() {
@@ -2540,6 +3199,8 @@ document.addEventListener('DOMContentLoaded', () => {
   try { initNotifications(); } catch (e) { console.error('initNotifications error:', e); }
   try { initUserBadge(); } catch (e) { console.error('initUserBadge error:', e); }
   try { initCloudSync(); } catch (e) { console.error('initCloudSync error:', e); }
+  try { initProjectsRealtimeSync(); } catch (e) { console.error('initProjectsRealtimeSync error:', e); }
+  try { updateNotificationCenter(); } catch (e) { console.error('updateNotificationCenter error:', e); }
 
   currentDate = todayStr();
   const dp = document.getElementById('dayPicker');

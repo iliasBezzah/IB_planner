@@ -1624,4 +1624,315 @@ textarea{resize:vertical;}
   margin-top: 2px;
 }
 
+/* ══════════════════════════════════════════
+   IN-APP NOTIFICATION CENTER
+══════════════════════════════════════════ */
+.notif-menu-container {
+  position: relative;
+}
+.notif-bell-btn {
+  background: rgba(255,255,255,0.15);
+  border: 1.5px solid rgba(255,255,255,0.3);
+  color: #fff;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+}
+.notif-bell-btn:hover {
+  background: rgba(255,255,255,0.25);
+  transform: translateY(-1px);
+}
+.notif-counter-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #E53935;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--primary-dark, #0D47A1);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+}
+.notif-counter-badge.hidden {
+  display: none;
+}
+.notif-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 330px;
+  max-width: 90vw;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 12px 36px var(--shadow);
+  z-index: 999;
+  overflow: hidden;
+  animation: dropdownIn 0.2s ease;
+}
+.notif-menu-container.open .notif-dropdown-menu {
+  display: block;
+}
+.notif-dropdown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+}
+.ndh-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-text-sm {
+  background: none;
+  border: none;
+  font-size: 11px;
+  color: var(--primary);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.btn-text-sm:hover {
+  background: rgba(21,101,192,0.08);
+}
+.notif-dropdown-body {
+  max-height: 380px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.notif-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s ease;
+  position: relative;
+}
+.notif-item:hover {
+  background: var(--surface2);
+}
+.notif-item.unread {
+  background: #EBF3FB;
+}
+.notif-item.unread::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 14px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+.notif-item-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+  background: #E3F2FD;
+  color: var(--primary);
+}
+.notif-item-icon.done {
+  background: #E8F5E9;
+  color: #2E7D32;
+}
+.notif-item-icon.deadline {
+  background: #FFEBEE;
+  color: #C62828;
+}
+.notif-item-icon.invite {
+  background: #EDE7F6;
+  color: #512DA8;
+}
+.notif-item-content {
+  flex: 1;
+  min-width: 0;
+}
+.notif-item-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+.notif-item-text {
+  font-size: 11px;
+  color: var(--text-light);
+  line-height: 1.3;
+}
+.notif-item-time {
+  font-size: 10px;
+  color: var(--text-light);
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0.8;
+}
+.notif-empty {
+  padding: 30px 16px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-light);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.notif-empty i {
+  font-size: 28px;
+  color: #4CAF50;
+  opacity: 0.7;
+}
+
+/* ══════════════════════════════════════════
+   COLLABORATION, INVITATIONS & ASSIGNEE
+══════════════════════════════════════════ */
+.cd-stage-assignee {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: #EBF3FB;
+  color: #1565C0;
+  font-weight: 600;
+  margin-left: auto;
+  border: 1px solid #BBDEFB;
+}
+.cd-stage-assignee.unassigned {
+  background: var(--surface2);
+  color: var(--text-light);
+  border-color: var(--border);
+  font-style: italic;
+  font-weight: 500;
+}
+.cd-stage-assignee-av {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.stage-assignee-select {
+  font-size: 12px;
+  padding: 6px 8px;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+}
+.member-status-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 8px;
+  text-transform: uppercase;
+}
+.member-status-pill.owner {
+  background: #E3F2FD;
+  color: #1565C0;
+}
+.member-status-pill.collaborator {
+  background: #E8F5E9;
+  color: #2E7D32;
+}
+.member-status-pill.invited {
+  background: #FFF8E1;
+  color: #F57F17;
+}
+.invite-feedback {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.invite-feedback.success {
+  background: #E8F5E9;
+  color: #2E7D32;
+  border: 1px solid #C8E6C9;
+}
+.invite-feedback.error {
+  background: #FFEBEE;
+  color: #C62828;
+  border: 1px solid #FFCDD2;
+}
+.invite-feedback.hidden {
+  display: none;
+}
+
+/* Activity stream card in Project Tracker */
+.cd-activity-box {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+.cd-activity-header {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cd-activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+.cd-activity-item {
+  font-size: 11px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.3;
+}
+.cd-activity-time {
+  font-size: 10px;
+  color: var(--text-light);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
 

@@ -14,7 +14,7 @@
   <link rel="manifest" href="manifest.json"/>
   <link rel="apple-touch-icon" href="icon-192.svg"/>
 
-  <link rel="stylesheet" href="style.css?v=8"/>
+  <link rel="stylesheet" href="style.css?v=9"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
 </head>
 <body>
@@ -68,6 +68,25 @@
       <span class="sync-status-text" id="syncStatusText">Synced</span>
     </button>
     <div class="clock-box" id="liveClock"></div>
+
+    <!-- In-App Notification Center Bell -->
+    <div class="notif-menu-container" id="notifMenuContainer">
+      <button class="notif-bell-btn" id="notifCenterBtn" onclick="toggleNotificationCenter(event)" title="Activity & Notifications">
+        <i class="fas fa-bell"></i>
+        <span class="notif-counter-badge hidden" id="notifCounterBadge">0</span>
+      </button>
+
+      <!-- Notification Center Dropdown Menu -->
+      <div class="notif-dropdown-menu" id="notifDropdown">
+        <div class="notif-dropdown-header">
+          <div class="ndh-title"><i class="fas fa-bell"></i> Project &amp; Course Activity</div>
+          <button class="btn-text-sm" type="button" onclick="markAllNotificationsRead()">Mark all as read</button>
+        </div>
+        <div class="notif-dropdown-body" id="notifDropdownBody">
+          <div class="notif-empty"><i class="fas fa-check-circle"></i> No new activity</div>
+        </div>
+      </div>
+    </div>
 
     <!-- User Profile Dropdown Button -->
     <div class="user-menu-container" id="userMenuContainer">
@@ -919,20 +938,43 @@
         <label><i class="fas fa-tasks"></i> Project Milestones / Stages (Calculates Progress %)</label>
         <div class="stage-builder-list" id="stageBuilderList"></div>
         <div class="add-stage-row">
-          <input type="text" id="newStageInput" placeholder="Add milestone (e.g. Topic proposal, Core development, Testing, Report)…" onkeydown="if(event.key==='Enter'){event.preventDefault();addStageToBuilder();}"/>
+          <input type="text" id="newStageInput" placeholder="Add milestone (e.g. Topic proposal, Core development, Testing)…" onkeydown="if(event.key==='Enter'){event.preventDefault();addStageToBuilder();}"/>
+          <select id="newStageAssignee" class="stage-assignee-select" style="max-width:140px;" title="Assign milestone to member">
+            <option value="">👤 Unassigned</option>
+          </select>
           <button class="btn-secondary btn-sm" type="button" onclick="addStageToBuilder()"><i class="fas fa-plus"></i> Add Stage</button>
         </div>
       </div>
 
-      <!-- Collaborating Team Members -->
-      <div class="form-group">
-        <label><i class="fas fa-users"></i> Assigned Collaborating Team Members</label>
+      <!-- Real-Time Collaborating Team Members & Invitations -->
+      <div class="form-group" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+        <label style="font-weight:700;color:var(--text);margin-bottom:6px;display:flex;align-items:center;gap:6px">
+          <i class="fas fa-users" style="color:var(--primary)"></i> Real-Time Project Team &amp; Invitations
+        </label>
+        <p style="font-size:11px;color:var(--text-light);margin-bottom:8px">
+          Invite registered classmates by username or email. Milestones, progress, and updates synchronize live via Firebase.
+        </p>
+
+        <!-- Current Members List -->
         <div class="members-builder-list" id="membersBuilderList"></div>
-        <div class="add-member-row">
-          <input type="text" id="newMemberName" placeholder="Teammate name…"/>
-          <input type="text" id="newMemberRole" placeholder="Role (e.g. Lead, Frontend, Tester, Slides)"/>
-          <button class="btn-secondary btn-sm" type="button" onclick="addMemberToBuilder()"><i class="fas fa-user-plus"></i> Add Member</button>
+
+        <!-- Invite Input Row -->
+        <div class="add-member-row" style="margin-top:8px;">
+          <input type="text" id="inviteUserInput" placeholder="Enter username (e.g. alexk) or email address…" onkeydown="if(event.key==='Enter'){event.preventDefault();inviteUserToProject();}"/>
+          <select id="inviteUserRole" style="max-width:140px;">
+            <option value="Collaborator">Collaborator</option>
+            <option value="Lead">Lead</option>
+            <option value="Developer">Developer</option>
+            <option value="Researcher">Researcher</option>
+            <option value="Designer">Designer</option>
+            <option value="Presenter">Presenter</option>
+          </select>
+          <button class="btn-primary btn-sm" type="button" id="btnInviteUser" onclick="inviteUserToProject()">
+            <i class="fas fa-paper-plane"></i> Invite
+          </button>
         </div>
+        <div id="inviteFeedback" class="invite-feedback hidden"></div>
+
         <div class="quick-contacts-wrap" id="quickContactsWrap" style="margin-top:8px">
           <small style="color:var(--text-light);font-size:11px;display:block;margin-bottom:4px">Quick pick from your contacts:</small>
           <div class="quick-contacts-pills" id="quickContactsPills"></div>
@@ -1051,7 +1093,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js?v=8"></script>
-<script src="app.js?v=8"></script>
+<script src="firebase-config.js?v=9"></script>
+<script src="app.js?v=9"></script>
 </body>
 </html>
