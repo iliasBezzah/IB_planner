@@ -578,33 +578,38 @@ function switchView(v) {
 // DAY NAVIGATION
 // ══════════════════════════════════════════
 function loadDay() {
-  currentDate = document.getElementById('dayPicker').value || todayStr();
+  const dp = document.getElementById('dayPicker');
+  currentDate = (dp && dp.value) ? dp.value : todayStr();
   refreshAll();
 }
 function changeDay(delta) {
   currentDate = offset(currentDate, delta);
-  document.getElementById('dayPicker').value = currentDate;
+  const dp = document.getElementById('dayPicker');
+  if (dp) dp.value = currentDate;
   refreshAll();
 }
 function goToday() {
   currentDate = todayStr();
-  document.getElementById('dayPicker').value = currentDate;
+  const dp = document.getElementById('dayPicker');
+  if (dp) dp.value = currentDate;
   refreshAll();
 }
 function refreshAll() {
   updateDayLabel();
-  renderSchedule();
-  renderStats();
-  loadHealthUI();
-  loadMoodUI();
-  loadEnergyUI();
-  renderGoals();
   if (isTeacherRole()) {
     renderTeacherDashboard();
+  } else {
+    renderSchedule();
+    renderStats();
+    loadHealthUI();
+    loadMoodUI();
+    loadEnergyUI();
+    renderGoals();
   }
 }
 function updateDayLabel() {
-  document.getElementById('dayLabel').textContent = formatDateLong(currentDate);
+  const el = document.getElementById('dayLabel');
+  if (el) el.textContent = formatDateLong(currentDate);
 }
 
 // ══════════════════════════════════════════
@@ -2958,11 +2963,17 @@ function applyRoleUI() {
     sub.textContent = isTeacher ? 'Academic Portal: Instructor Hub' : 'Full Day Academic Manager';
   }
 
-  // 2. Header Action Buttons
+  // 2. Strict Role Header Action Buttons
   const createBtn = document.getElementById('btnCreateClassHeader');
   const joinBtn = document.getElementById('btnJoinClassHeader');
-  if (createBtn) createBtn.classList.toggle('hidden', !isTeacher);
-  if (joinBtn) joinBtn.classList.toggle('hidden', isTeacher);
+  if (createBtn) {
+    createBtn.style.display = isTeacher ? 'inline-flex' : 'none';
+    createBtn.classList.toggle('hidden', !isTeacher);
+  }
+  if (joinBtn) {
+    joinBtn.style.display = isTeacher ? 'none' : 'inline-flex';
+    joinBtn.classList.toggle('hidden', isTeacher);
+  }
 
   // 3. Top Navigation Labels & Icons
   const navMap = isTeacher ? {
@@ -2995,11 +3006,17 @@ function applyRoleUI() {
     }
   });
 
-  // 4. Toggle Dashboard View Containers
+  // 4. Complete Separation of Teacher vs Student Dashboard
   const stuWidgets = document.getElementById('studentDashboardWidgets');
   const tchHub = document.getElementById('teacherDashboardHub');
-  if (stuWidgets) stuWidgets.classList.toggle('hidden', isTeacher);
-  if (tchHub) tchHub.classList.toggle('hidden', !isTeacher);
+  if (stuWidgets) {
+    stuWidgets.style.display = isTeacher ? 'none' : 'block';
+    stuWidgets.classList.toggle('hidden', isTeacher);
+  }
+  if (tchHub) {
+    tchHub.style.display = isTeacher ? 'flex' : 'none';
+    tchHub.classList.toggle('hidden', !isTeacher);
+  }
 
   if (isTeacher) {
     renderTeacherDashboard();
@@ -3036,6 +3053,10 @@ function generateNewClassCodeInput() {
 }
 
 function openCreateClassroomModal(editCourseId = null) {
+  if (!isTeacherRole()) {
+    showToast('⚠️ Only instructors can create academic courses.');
+    return;
+  }
   document.getElementById('editClassroomId').value = editCourseId || '';
   const isEdit = !!editCourseId;
   const course = isEdit ? (globalData.recurring || []).find(r => r.id === editCourseId) : null;
@@ -3197,6 +3218,14 @@ function renderTeacherDashboard() {
   if (quickSelect) {
     quickSelect.innerHTML = '<option value="">Select course to broadcast…</option>' +
       courses.map(c => `<option value="${c.classCode || c.id}">${esc(c.title)} (${c.classCode || 'No Code'})</option>`).join('');
+  }
+
+  const dateLbl = document.getElementById('teacherTodayDateLabel');
+  if (dateLbl) {
+    const isToday = currentDate === todayStr();
+    dateLbl.textContent = isToday
+      ? `Upcoming classes and lecture sessions scheduled to teach today (${formatDateShort(currentDate)})`
+      : `Upcoming classes and lecture sessions scheduled to teach on ${formatDateShort(currentDate)}`;
   }
 
   // Populate Today's Teaching Schedule
@@ -3506,6 +3535,10 @@ function quickBroadcastAnnouncement() {
 
 // ── Student Join Course Modal ──
 function openJoinClassModal(prefillCode = '') {
+  if (isTeacherRole()) {
+    showToast('⚠️ Instructors cannot join courses as students. Use your Academic Hub to manage courses.');
+    return;
+  }
   const codeInp = document.getElementById('jcCode');
   const preview = document.getElementById('jcPreviewBox');
   const feedback = document.getElementById('jcFeedback');
@@ -3894,7 +3927,7 @@ function initPWA(){
 
     if('caches' in window) {
       caches.keys().then(keys => {
-        keys.forEach(k => { if(k !== 'ib-planner-v10') caches.delete(k); });
+        keys.forEach(k => { if(k !== 'ib-planner-v11') caches.delete(k); });
       });
     }
   }

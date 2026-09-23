@@ -14,7 +14,7 @@
   <link rel="manifest" href="manifest.json"/>
   <link rel="apple-touch-icon" href="icon-192.svg"/>
 
-  <link rel="stylesheet" href="style.css?v=10"/>
+  <link rel="stylesheet" href="style.css?v=11"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
 </head>
 <body>
@@ -64,7 +64,7 @@
 
   <div class="header-right">
     <!-- Role-Specific Action Button (Join Course for Student / Create Class for Teacher) -->
-    <button class="btn-role-action teacher-action hidden" id="btnCreateClassHeader" onclick="openCreateClassroomModal()" title="Create New Academic Course">
+    <button class="btn-role-action teacher-action hidden" id="btnCreateClassHeader" onclick="openCreateClassroomModal()" title="Create New Academic Course" style="display:none;">
       <i class="fas fa-plus-circle"></i> <span>Create Class</span>
     </button>
     <button class="btn-role-action student-action" id="btnJoinClassHeader" onclick="openJoinClassModal()" title="Join Course with Class Code">
@@ -149,18 +149,18 @@
   <!-- ─────────── DASHBOARD / MY DAY VIEW ─────────── -->
   <section class="view active" id="view-dashboard">
 
-    <div class="day-selector-bar">
-      <button class="btn-secondary" onclick="changeDay(-1)"><i class="fas fa-chevron-left"></i></button>
-      <div class="day-display">
-        <input type="date" id="dayPicker" onchange="loadDay()"/>
-        <span id="dayLabel" class="day-label"></span>
-      </div>
-      <button class="btn-secondary" onclick="changeDay(1)"><i class="fas fa-chevron-right"></i></button>
-      <button class="btn-primary" onclick="goToday()"><i class="fas fa-calendar-day"></i> Today</button>
-    </div>
-
     <!-- ─────────── STUDENT DASHBOARD WIDGETS (Visible for Students) ─────────── -->
     <div id="studentDashboardWidgets">
+      <div class="day-selector-bar">
+        <button class="btn-secondary" onclick="changeDay(-1)"><i class="fas fa-chevron-left"></i></button>
+        <div class="day-display">
+          <input type="date" id="dayPicker" onchange="loadDay()"/>
+          <span id="dayLabel" class="day-label"></span>
+        </div>
+        <button class="btn-secondary" onclick="changeDay(1)"><i class="fas fa-chevron-right"></i></button>
+        <button class="btn-primary" onclick="goToday()"><i class="fas fa-calendar-day"></i> Today</button>
+      </div>
+
       <!-- Stats Row -->
       <div class="stats-row">
         <div class="stat-card" style="--accent:#1565C0">
@@ -346,8 +346,8 @@
     </div><!-- /studentDashboardWidgets -->
 
     <!-- ─────────── TEACHER ACADEMIC HUB (Visible for Teachers) ─────────── -->
-    <div id="teacherDashboardHub" class="teacher-dashboard-hub hidden">
-      <!-- Executive Academic Metrics -->
+    <div id="teacherDashboardHub" class="teacher-dashboard-hub hidden" style="display:none;">
+      <!-- 1. Executive Academic Metrics at the very top of the page -->
       <div class="stats-row teacher-stats-row">
         <div class="stat-card" style="--accent:#1565C0">
           <i class="fas fa-university"></i>
@@ -371,52 +371,58 @@
         </div>
       </div>
 
-      <!-- Teacher Main Workspace Grid -->
-      <div class="teacher-hub-grid">
-        <!-- Left: Course Hub & Classrooms -->
-        <div class="panel teacher-courses-panel">
-          <div class="panel-header">
-            <div>
-              <h2><i class="fas fa-chalkboard"></i> Academic Course Hub</h2>
-              <p class="panel-sub-desc">Manage taught courses, distribute student Class Codes, and publish course-wide materials.</p>
-            </div>
+      <!-- 2. Teaching Schedule / Lectures for Today -->
+      <div class="panel panel-teacher-today">
+        <div class="panel-header">
+          <div>
+            <h2><i class="fas fa-chalkboard-teacher"></i> Teaching Schedule &mdash; Lectures for Today</h2>
+            <p class="panel-sub-desc" id="teacherTodayDateLabel">Classes and lecture sessions scheduled to teach</p>
+          </div>
+          <div class="panel-actions">
+            <button class="btn-secondary btn-sm" onclick="changeDay(-1)" title="Previous Day"><i class="fas fa-chevron-left"></i></button>
+            <button class="btn-secondary btn-sm" onclick="goToday()"><i class="fas fa-calendar-day"></i> Today</button>
+            <button class="btn-secondary btn-sm" onclick="changeDay(1)" title="Next Day"><i class="fas fa-chevron-right"></i></button>
+            <button class="btn-primary btn-sm" onclick="openCreateClassroomModal()"><i class="fas fa-plus"></i> Add Course</button>
+          </div>
+        </div>
+        <div class="teacher-today-list" id="teacherTodayClassesList"></div>
+      </div>
+
+      <!-- 3. Active Courses & Classes Management -->
+      <div class="panel teacher-courses-panel">
+        <div class="panel-header">
+          <div>
+            <h2><i class="fas fa-university"></i> Active Courses &amp; Classes Management</h2>
+            <p class="panel-sub-desc">Manage taught courses, distribute student Class Codes, and publish course-wide materials.</p>
+          </div>
+          <div class="panel-actions">
             <button class="btn-primary" onclick="openCreateClassroomModal()">
               <i class="fas fa-plus"></i> Create Academic Course
             </button>
           </div>
-
-          <div class="teacher-courses-list" id="teacherCoursesGrid">
-            <!-- Dynamically populated course cards with Class Codes, copy buttons & actions -->
-          </div>
         </div>
 
-        <!-- Right Column: Today's Teaching Sessions & Quick Broadcast -->
-        <div class="teacher-right-col">
-          <!-- Teaching Timetable for Today -->
-          <div class="panel panel-teacher-today">
-            <div class="panel-header">
-              <h3><i class="fas fa-clock"></i> Today's Teaching Schedule</h3>
-            </div>
-            <div class="teacher-today-list" id="teacherTodayClassesList"></div>
-          </div>
+        <div class="teacher-courses-list" id="teacherCoursesGrid">
+          <!-- Dynamically populated course cards with Class Codes, copy buttons & actions -->
+        </div>
+      </div>
 
-          <!-- Quick Announcement Publisher -->
-          <div class="panel panel-teacher-broadcast">
-            <div class="panel-header">
-              <h3><i class="fas fa-bullhorn"></i> Broadcast Announcement</h3>
-            </div>
-            <div class="quick-form">
-              <label style="font-size:11px;font-weight:600;color:var(--text)">Target Course</label>
-              <select id="quickAnnounceCourseSelect">
-                <option value="">Select course…</option>
-              </select>
-              <input type="text" id="quickAnnounceTitle" placeholder="Headline / Subject (e.g. Midterm prep)"/>
-              <textarea id="quickAnnounceText" rows="2" placeholder="Write message to all enrolled students…"></textarea>
-              <button class="btn-primary full-width" onclick="quickBroadcastAnnouncement()">
-                <i class="fas fa-paper-plane"></i> Broadcast to Students
-              </button>
-            </div>
-          </div>
+      <!-- Quick Announcement Publisher -->
+      <div class="panel panel-teacher-broadcast">
+        <div class="panel-header">
+          <h3><i class="fas fa-bullhorn"></i> Quick Course Broadcast</h3>
+          <p class="panel-sub-desc">Broadcast instant announcements to all enrolled students in a course.</p>
+        </div>
+        <div class="quick-form" style="max-width: 650px;">
+          <label style="font-size:11px;font-weight:600;color:var(--text)">Target Course</label>
+          <select id="quickAnnounceCourseSelect">
+            <option value="">Select course to broadcast…</option>
+          </select>
+          <input type="text" id="quickAnnounceTitle" placeholder="Headline / Subject (e.g. Midterm prep, Office Hours)"/>
+          <textarea id="quickAnnounceText" rows="2" placeholder="Write message to all enrolled students…"></textarea>
+          <button class="btn-primary" onclick="quickBroadcastAnnouncement()">
+            <i class="fas fa-paper-plane"></i> Broadcast to Students
+          </button>
         </div>
       </div>
     </div><!-- /teacherDashboardHub -->
@@ -1424,7 +1430,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js?v=10"></script>
-<script src="app.js?v=10"></script>
+<script src="firebase-config.js?v=11"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>
