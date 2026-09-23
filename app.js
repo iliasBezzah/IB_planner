@@ -488,13 +488,14 @@ function renderRecurringList() {
     else if (r.freq==='monthly') rule='Monthly';
     const until = r.endDate ? ` → until ${formatDateShort(r.endDate)}` : '';
     return `
-      <div class="recurring-item">
+      <div class="recurring-item" onclick="openCourseDetails('${r.id}')" style="cursor:pointer;" title="Tap to open Course Details, Projects & Assignments">
         <div style="width:5px;border-radius:3px;background:${r.color||CAT_COLORS[r.cat]||'#1565C0'};min-height:44px;flex-shrink:0;align-self:stretch"></div>
         <div class="recurring-item-body">
           <div class="recurring-item-title">${CAT_ICONS[r.cat]||'📌'} ${esc(r.title)}</div>
           <div class="recurring-item-meta">${r.start}–${r.end} &nbsp;|&nbsp; ${rule}${until}</div>
           ${r.location?`<div class="recurring-item-meta"><i class="fas fa-map-marker-alt"></i> ${esc(r.location)}</div>`:''}
-        <div class="recurring-item-actions">
+        </div>
+        <div class="recurring-item-actions" onclick="event.stopPropagation()">
           <button class="recurring-item-edit" title="Edit Routine Class" onclick="editRecurringClass('${r.id}')">
             <i class="fas fa-edit"></i>
           </button>
@@ -878,13 +879,13 @@ function renderSchedule() {
           <div class="erb-header"><i class="fas fa-redo"></i> You have ${recs.length} routine class${recs.length > 1 ? 'es' : ''} configured:</div>
           <div class="erb-list">
             ${recs.map(r => `
-              <div class="erb-item" onclick="editRecurringClass('${r.id}')">
+              <div class="erb-item" onclick="openCourseDetails('${r.id}')" title="Tap to view course assignments, project tracker & notes">
                 <span class="erb-dot" style="background:${r.color || CAT_COLORS[r.cat] || '#1565C0'}"></span>
                 <div class="erb-info">
                   <span class="erb-title">${CAT_ICONS[r.cat] || '📌'} ${esc(r.title)}</span>
                   <span class="erb-meta">${r.start}–${r.end} &bull; ${r.freq === 'weekly' ? (r.days||[]).map(d => dayNames[d]).join(', ') : r.freq}</span>
                 </div>
-                <button class="erb-edit-btn" title="Edit this routine class"><i class="fas fa-edit"></i> Edit</button>
+                <button class="erb-edit-btn" title="Edit this routine class" onclick="event.stopPropagation();editRecurringClass('${r.id}')"><i class="fas fa-edit"></i> Edit</button>
               </div>
             `).join('')}
           </div>
@@ -910,7 +911,7 @@ function renderSchedule() {
     return;
   }
   list.innerHTML = events.map(ev => `
-    <div class="event-card ${ev.done ? 'done' : ''} ${ev.isRecurring ? 'is-recurring' : ''}" onclick="editEvent('${ev.id}')">
+    <div class="event-card ${ev.done ? 'done' : ''} ${ev.isRecurring ? 'is-recurring' : ''}" onclick="openCourseDetails('${ev.recurId || ev.id}')" title="Tap to view course assignments, project tracker & notes">
       <div class="event-stripe" style="background:${ev.color || CAT_COLORS[ev.cat] || '#1565C0'}"></div>
       <div class="ev-body">
         <div class="ev-title">
@@ -927,7 +928,7 @@ function renderSchedule() {
         ${ev.notes ? `<div style="font-size:11px;color:var(--text-light);margin-top:3px">${esc(ev.notes)}</div>` : ''}
       </div>
       <div class="ev-actions" onclick="event.stopPropagation()">
-        <button class="ev-btn edit-btn" title="Edit Class" onclick="editEvent('${ev.id}')"><i class="fas fa-edit"></i></button>
+        <button class="ev-btn edit-btn" title="Edit Class Schedule" onclick="editEvent('${ev.id}')"><i class="fas fa-edit"></i></button>
         ${!ev.isRecurring ? `<button class="ev-btn done-btn" title="${ev.done ? 'Undo' : 'Mark done'}" onclick="toggleEventDone('${ev.id}')"><i class="fas fa-${ev.done ? 'undo' : 'check'}"></i></button>` : ''}
         <button class="ev-btn del-btn" title="Delete" onclick="deleteEvent('${ev.id}')"><i class="fas fa-trash"></i></button>
       </div>
@@ -995,7 +996,8 @@ function renderWeek() {
           ${events.length?events.map(ev=>`
             <div class="week-event-chip ${ev.done?'done':''}"
                  style="background:${ev.color||CAT_COLORS[ev.cat]||'#1565C0'}"
-                 onclick="goToDateAndEdit('${dateStr}','${ev.id}')">
+                 onclick="openCourseDetails('${ev.recurId || ev.id}')"
+                 title="Tap to view course assignments, project tracker & notes">
               <small>${ev.start} ${ev.isRecurring?'🔁':''}</small>
               ${CAT_ICONS[ev.cat]||'📌'} ${esc(ev.title)}
             </div>`).join(''):`<div style="font-size:11px;color:var(--text-light);text-align:center;padding:12px 6px;opacity:.6">Free</div>`}
@@ -1086,7 +1088,7 @@ function renderTimeline(){
       <div class="tl-hour-label">${hStr}:00</div>
       <div class="tl-events">
         ${hrEvs.map(ev=>`
-          <div class="tl-event" style="background:${ev.color||CAT_COLORS[ev.cat]||'#1565C0'};opacity:${ev.done?.55:1}" onclick="editEvent('${ev.id}')">
+          <div class="tl-event" style="background:${ev.color||CAT_COLORS[ev.cat]||'#1565C0'};opacity:${ev.done?.55:1}" onclick="openCourseDetails('${ev.recurId || ev.id}')" title="Tap to view course assignments, project tracker & notes">
             <i class="fas fa-circle" style="font-size:7px"></i>
             ${ev.start}–${ev.end}&nbsp;${CAT_ICONS[ev.cat]||'📌'} ${esc(ev.title)}
             ${ev.isRecurring?'<span style="margin-left:auto;font-size:10px">🔁</span>':''}
@@ -1137,13 +1139,31 @@ function editTask(id){
   openModal('addTaskModal');
 }
 
-function toggleTask(id){const t=dayData(currentDate).tasks.find(t=>t.id===id);if(t){t.done=!t.done;save();renderTasks();renderStats();}}
+function toggleTask(id){
+  const t = dayData(currentDate).tasks.find(t=>t.id===id);
+  if(t){
+    t.done = !t.done;
+    (globalData.recurring || []).forEach(c => {
+      const ca = (c.assignments || []).find(a => a.id === id);
+      if (ca) ca.done = t.done;
+    });
+    save();
+    renderTasks();
+    renderStats();
+  }
+}
 
 function deleteTask(id){
   if(!confirm('Delete this assignment?'))return;
-  const data=dayData(currentDate);
-  data.tasks=data.tasks.filter(t=>t.id!==id);
-  save();renderTasks();renderStats();showToast('🗑️ Deleted.');
+  const data = dayData(currentDate);
+  data.tasks = data.tasks.filter(t=>t.id!==id);
+  (globalData.recurring || []).forEach(c => {
+    if (c.assignments) c.assignments = c.assignments.filter(a => a.id !== id);
+  });
+  save();
+  renderTasks();
+  renderStats();
+  showToast('🗑️ Deleted.');
 }
 
 function renderTasks(){
@@ -1318,58 +1338,939 @@ function renderAnalytics(){
 // NOTIFICATIONS
 // ══════════════════════════════════════════
 function initNotifications(){
-  if(!('Notification'in window))return;
-  if(Notification.permission==='default') document.getElementById('notifBanner').classList.remove('hidden');
-}
-function requestNotifPermission(){
-  if(!('Notification'in window)){showToast('⚠️ Notifications not supported.');return;}
-  Notification.requestPermission().then(perm=>{dismissNotifBanner();showToast(perm==='granted'?'🔔 Notifications enabled!':'🔕 Notifications denied.');});
-}
-function dismissNotifBanner(){document.getElementById('notifBanner').classList.add('hidden');}
-
-function fireNotification(title,body){
-  showReminder(`⏰ ${body}`);
-  if('Notification'in window&&Notification.permission==='granted'){
-    const n=new Notification('IB Student — '+title,{body,icon:'./icon-192.svg',badge:'./icon-192.svg',tag:'ib-'+uid()});
-    n.onclick=()=>{window.focus();n.close();};
-    setTimeout(()=>n.close(),10000);
+  updateNotifSettingsUI();
+  if(!('Notification' in window)) return;
+  if(Notification.permission === 'default') {
+    const banner = document.getElementById('notifBanner');
+    if (banner) banner.classList.remove('hidden');
   }
 }
 
+function updateNotifSettingsUI() {
+  const statusEl = document.getElementById('notifStatusText');
+  if (!statusEl) return;
+  if (!('Notification' in window)) {
+    statusEl.innerHTML = '<span style="color:#C62828">⚠️ Not supported in this browser</span>';
+    return;
+  }
+  const p = Notification.permission;
+  if (p === 'granted') {
+    statusEl.innerHTML = '<span style="color:#2E7D32;font-weight:600"><i class="fas fa-check-circle"></i> Permissions Granted &amp; Active</span>';
+  } else if (p === 'denied') {
+    statusEl.innerHTML = '<span style="color:#C62828;font-weight:600"><i class="fas fa-times-circle"></i> Blocked by browser settings</span>';
+  } else {
+    statusEl.innerHTML = '<span style="color:#FFA000;font-weight:600"><i class="fas fa-question-circle"></i> Permission not requested yet</span>';
+  }
+}
+
+async function requestNotifPermission(){
+  if(!('Notification' in window)){
+    showToast('⚠️ Notifications are not supported by this browser.');
+    return;
+  }
+  try {
+    const perm = await Notification.requestPermission();
+    dismissNotifBanner();
+    updateNotifSettingsUI();
+    if(perm === 'granted'){
+      showToast('🔔 Notifications enabled successfully!');
+      fireNotification('Notifications Active', 'You will receive alerts for upcoming classes, deadlines, and project milestones.', { tag: 'welcome-alert' });
+    } else if(perm === 'denied'){
+      showToast('🔕 Notifications were blocked. To enable them, allow notifications in site settings.', 5000);
+    }
+  } catch(err) {
+    console.warn('requestNotifPermission error:', err);
+    showToast('⚠️ Permission error: ' + (err.message || 'Failed'));
+  }
+}
+
+function dismissNotifBanner(){
+  const banner = document.getElementById('notifBanner');
+  if (banner) banner.classList.add('hidden');
+}
+
+// Subtle audio chime via Web Audio API (cross-platform, zero external file dependency)
+function playNotificationChime() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.35);
+  } catch(e) {}
+}
+
+async function fireNotification(title, body, data = {}){
+  showReminder(body);
+  playNotificationChime();
+
+  if(!('Notification' in window) || Notification.permission !== 'granted') return;
+
+  const notifTitle = 'IB Student — ' + title;
+  const options = {
+    body,
+    icon: './icon-192.svg',
+    badge: './icon-192.svg',
+    vibrate: [200, 100, 200],
+    tag: data.tag || 'ib-' + uid(),
+    data: Object.assign({ url: './index.html' }, data)
+  };
+
+  // 1. Try ServiceWorkerRegistration.showNotification (standard on Android Chrome & iOS Safari PWA)
+  if('serviceWorker' in navigator) {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      if (reg && reg.showNotification) {
+        await reg.showNotification(notifTitle, options);
+        return;
+      }
+    } catch(e) {
+      console.warn('SW showNotification fallback:', e);
+    }
+  }
+
+  // 2. Fallback to desktop window Notification constructor
+  try {
+    const n = new Notification(notifTitle, options);
+    n.onclick = () => { window.focus(); n.close(); };
+    setTimeout(() => { try { n.close(); } catch(e){} }, 10000);
+  } catch(err) {
+    console.warn('Standard Notification fallback note:', err);
+  }
+}
+
+async function testNotification(){
+  if(!('Notification' in window)){
+    showToast('⚠️ Notifications are not supported in this browser.');
+    return;
+  }
+  if(Notification.permission !== 'granted'){
+    const perm = await Notification.requestPermission();
+    updateNotifSettingsUI();
+    if(perm !== 'granted'){
+      showToast('⚠️ Please allow notification permission in your browser to test alerts.');
+      return;
+    }
+  }
+  showToast('🚀 Sending test notification…');
+  await fireNotification(
+    'Test Alert',
+    '🔔 Push notifications are working perfectly on this device! Timetable, assignment, and project reminders are active.',
+    { tag: 'test-' + Date.now() }
+  );
+}
+
 function checkReminders(){
-  if(!(globalData.settings?.reminders!==false))return;
-  if(currentDate!==todayStr())return;
-  const now=new Date();
-  const nowMins=now.getHours()*60+now.getMinutes();
-  (dayData(currentDate).events||[]).forEach(ev=>{
-    if(ev.reminded||ev.done)return;
-    const[h,m]=ev.start.split(':').map(Number);
-    const rem=ev.reminder||0;
-    if(rem>0&&nowMins>=(h*60+m)-rem&&nowMins<(h*60+m)){ev.reminded=true;save();fireNotification(ev.title,`"${ev.title}" starts in ${rem} min!`);}
+  if(globalData.settings?.reminders === false) return;
+  const realToday = todayStr();
+  const now = new Date();
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+
+  let notifLog = {};
+  try {
+    notifLog = JSON.parse(localStorage.getItem('ib_notif_log') || '{}');
+  } catch { notifLog = {}; }
+
+  // 1. Today's Timetable Events
+  (dayData(realToday).events || []).forEach(ev => {
+    if(ev.reminded || ev.done) return;
+    const [h, m] = (ev.start || '00:00').split(':').map(Number);
+    const rem = ev.reminder || 0;
+    if(rem > 0 && nowMins >= (h * 60 + m) - rem && nowMins < (h * 60 + m)){
+      ev.reminded = true;
+      save();
+      fireNotification(ev.title, `"${ev.title}" starts in ${rem} min!`, { tag: 'ev-' + ev.id });
+    }
   });
-  (globalData.recurring||[]).filter(r=>isRecurringOnDate(r,currentDate)).forEach(r=>{
-    const key='rec_reminded_'+r.id+'_'+currentDate;
-    if(sessionStorage.getItem(key))return;
-    const[h,m]=r.start.split(':').map(Number);
-    const rem=r.reminder||0;
-    if(rem>0&&nowMins>=(h*60+m)-rem&&nowMins<(h*60+m)){sessionStorage.setItem(key,'1');fireNotification(r.title,`"${r.title}" starts in ${rem} min!`);}
+
+  // 2. Today's Recurring Classes
+  (globalData.recurring || []).filter(r => isRecurringOnDate(r, realToday)).forEach(r => {
+    const logKey = 'rec_' + r.id + '_' + realToday;
+    if(notifLog[logKey]) return;
+    const [h, m] = (r.start || '00:00').split(':').map(Number);
+    const rem = r.reminder || 0;
+    if(rem > 0 && nowMins >= (h * 60 + m) - rem && nowMins < (h * 60 + m)){
+      notifLog[logKey] = Date.now();
+      try { localStorage.setItem('ib_notif_log', JSON.stringify(notifLog)); } catch(e){}
+      fireNotification(r.title, `"${r.title}" starts in ${rem} min!`, { tag: 'rec-' + r.id, courseId: r.id });
+    }
+  });
+
+  // 3. Course Assignments & Deadlines
+  (globalData.recurring || []).forEach(course => {
+    (course.assignments || []).forEach(a => {
+      if(a.done || !a.dueDate) return;
+      const dueTs = new Date(a.dueDate + 'T' + (a.dueTime || '23:59') + ':00').getTime();
+      const diffMins = Math.round((dueTs - now.getTime()) / 60000);
+      const intervals = a.reminderIntervals || ['1d', '2h', '30m', 'due'];
+
+      const checks = [
+        { code: '1d',  name: '1 day',   min: 1440 - 30, max: 1440 + 5 },
+        { code: '12h', name: '12 hours', min: 720 - 20,  max: 720 + 5 },
+        { code: '2h',  name: '2 hours',  min: 120 - 15,  max: 120 + 5 },
+        { code: '30m', name: '30 mins',  min: 30 - 10,   max: 30 + 5 },
+        { code: 'due', name: 'deadline', min: -5,        max: 5 }
+      ];
+
+      checks.forEach(chk => {
+        if(intervals.includes(chk.code)){
+          const logKey = `assign_${a.id}_${chk.code}`;
+          if(!notifLog[logKey] && diffMins >= chk.min && diffMins <= chk.max){
+            notifLog[logKey] = Date.now();
+            try { localStorage.setItem('ib_notif_log', JSON.stringify(notifLog)); } catch(e){}
+            const msg = chk.code === 'due'
+              ? `⚠️ Deadline Reached: "${a.title}" (${course.title}) is due now!`
+              : `📌 Assignment Reminder: "${a.title}" (${course.title}) is due in ${chk.name}!`;
+            fireNotification('Assignment Deadline', msg, { courseId: course.id, tag: logKey });
+          }
+        }
+      });
+    });
+
+    // 4. Course Project Tracker Reminders
+    const p = course.project;
+    if(p && p.remindersEnabled !== false && p.deadlineDate){
+      let freqDays = 3;
+      if(p.notificationFrequency === 'daily') freqDays = 1;
+      else if(p.notificationFrequency === 'every_2_days') freqDays = 2;
+      else if(p.notificationFrequency === 'every_3_days') freqDays = 3;
+      else if(p.notificationFrequency === 'weekly') freqDays = 7;
+      else if(p.notificationFrequency === 'custom') freqDays = parseInt(p.customIntervalDays) || 3;
+
+      const intervalMs = freqDays * 24 * 3600 * 1000;
+      const last = p.lastNotified || 0;
+      if(now.getTime() - last >= intervalMs){
+        p.lastNotified = now.getTime();
+        save();
+
+        const stages = p.stages || [];
+        const doneCount = stages.filter(s => s.done).length;
+        const pct = stages.length ? Math.round((doneCount / stages.length) * 100) : 0;
+        const dlineTs = new Date(p.deadlineDate + 'T' + (p.deadlineTime || '23:59') + ':00').getTime();
+        const daysLeft = Math.ceil((dlineTs - now.getTime()) / (1000 * 3600 * 24));
+
+        let msg = `Project "${p.title}" (${course.title}) is at ${pct}% completion. `;
+        if(daysLeft > 0) msg += `${daysLeft} days remaining until deadline (${p.deadlineDate}).`;
+        else if(daysLeft === 0) msg += `Deadline is today at ${p.deadlineTime || '23:59'}!`;
+        else msg += `Deadline was ${Math.abs(daysLeft)} days ago.`;
+
+        fireNotification('Project Milestone Update', msg, { courseId: course.id, tag: 'proj-' + p.id });
+      }
+    }
   });
 }
 
-function showReminder(text){const bell=document.getElementById('reminderBell');document.getElementById('reminderText').textContent=text;bell.classList.remove('hidden');setTimeout(()=>bell.classList.add('hidden'),12000);}
-function dismissReminder(){document.getElementById('reminderBell').classList.add('hidden');}
+function showReminder(text){
+  const bell = document.getElementById('reminderBell');
+  const textEl = document.getElementById('reminderText');
+  if(textEl) textEl.textContent = text;
+  if(bell) {
+    bell.classList.remove('hidden');
+    setTimeout(() => { if(bell) bell.classList.add('hidden'); }, 12000);
+  }
+}
+function dismissReminder(){
+  const bell = document.getElementById('reminderBell');
+  if(bell) bell.classList.add('hidden');
+}
+
+// ══════════════════════════════════════════
+// COURSE DETAILS, PROJECTS, ASSIGNMENTS & NOTES
+// ══════════════════════════════════════════
+let currentActiveCourseId = null;
+
+function getCourseById(courseId) {
+  if (!courseId) return null;
+  const baseId = courseId.includes('_') ? courseId.split('_')[0] : courseId;
+  // 1. Check routine recurring classes
+  let course = (globalData.recurring || []).find(r => r.id === baseId);
+  if (course) return course;
+
+  // 2. Check regular timetable events for currentDate
+  let ev = (dayData(currentDate).events || []).find(e => e.id === baseId);
+  if (ev) return ev;
+
+  // 3. Search across all dates in db
+  for (const date in db) {
+    if (db[date]?.events) {
+      ev = db[date].events.find(e => e.id === baseId);
+      if (ev) return ev;
+    }
+  }
+  return null;
+}
+
+function openCourseDetails(courseId) {
+  const course = getCourseById(courseId);
+  if (!course) {
+    showToast('⚠️ Course details not found.');
+    return;
+  }
+  currentActiveCourseId = course.id;
+
+  if (!Array.isArray(course.courseNotes)) course.courseNotes = [];
+  if (!Array.isArray(course.assignments)) course.assignments = [];
+
+  const catEl = document.getElementById('cdCatBadge');
+  const titleEl = document.getElementById('cdTitle');
+  const timeEl = document.getElementById('cdTime');
+  const locEl = document.getElementById('cdLocation');
+
+  if (catEl) {
+    catEl.innerHTML = `${CAT_ICONS[course.cat] || '🎓'} ${course.cat || 'Course'}`;
+    catEl.style.background = course.color || CAT_COLORS[course.cat] || '#1565C0';
+  }
+  if (titleEl) titleEl.textContent = course.title;
+  if (timeEl) timeEl.textContent = `${course.start} – ${course.end} (${dur(course.start, course.end)})`;
+  if (locEl) locEl.textContent = course.location || 'Classroom / Campus';
+
+  renderCourseProject(course);
+  renderCourseAssignments(course);
+  renderCourseNotes(course);
+
+  const activeTabBtn = document.querySelector('.course-tab-btn.active');
+  const currentTab = activeTabBtn ? activeTabBtn.dataset.tab : 'project';
+  switchCourseTab(currentTab || 'project');
+
+  openModal('courseDetailsModal');
+}
+
+function switchCourseTab(tabName) {
+  document.querySelectorAll('.course-tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tabName);
+  });
+  const panels = {
+    project: document.getElementById('cdPanelProject'),
+    assignments: document.getElementById('cdPanelAssignments'),
+    notes: document.getElementById('cdPanelNotes')
+  };
+  Object.keys(panels).forEach(key => {
+    if (panels[key]) panels[key].classList.toggle('active', key === tabName);
+  });
+}
+
+function editCurrentCourseSchedule() {
+  if (!currentActiveCourseId) return;
+  closeModal('courseDetailsModal');
+  const isRecur = (globalData.recurring || []).some(r => r.id === currentActiveCourseId);
+  if (isRecur) {
+    editRecurringClass(currentActiveCourseId);
+  } else {
+    editEvent(currentActiveCourseId);
+  }
+}
+
+// ── Course Project Tracker ──
+function renderCourseProject(course) {
+  const container = document.getElementById('cdProjectContainer');
+  if (!container) return;
+  const p = course.project;
+
+  if (!p) {
+    container.innerHTML = `
+      <div class="cd-empty-project">
+        <i class="fas fa-project-diagram"></i>
+        <h4>No Project Assigned Yet</h4>
+        <p>Track term projects, group assignments, milestones, and collaborate with your classmates.</p>
+        <button class="btn-primary" onclick="openProjectModal(false)">
+          <i class="fas fa-plus"></i> Set Up Course Project
+        </button>
+      </div>`;
+    return;
+  }
+
+  const stages = p.stages || [];
+  const completedStages = stages.filter(s => s.done).length;
+  const pct = stages.length ? Math.round((completedStages / stages.length) * 100) : 0;
+
+  let daysDiff = null;
+  let deadlineBadgeHtml = '';
+  if (p.deadlineDate) {
+    const dline = new Date(p.deadlineDate + 'T' + (p.deadlineTime || '23:59') + ':00');
+    const now = new Date();
+    daysDiff = Math.ceil((dline.getTime() - now.getTime()) / (1000 * 3600 * 24));
+
+    if (daysDiff > 7) {
+      deadlineBadgeHtml = `<span class="cd-deadline-pill"><i class="fas fa-calendar-check"></i> Due: ${formatDateShort(p.deadlineDate)} (${daysDiff} days left)</span>`;
+    } else if (daysDiff > 0) {
+      deadlineBadgeHtml = `<span class="cd-deadline-pill urgent"><i class="fas fa-stopwatch"></i> Due Soon: ${daysDiff} day${daysDiff > 1 ? 's' : ''} left (${formatDateShort(p.deadlineDate)})</span>`;
+    } else if (daysDiff === 0) {
+      deadlineBadgeHtml = `<span class="cd-deadline-pill urgent"><i class="fas fa-exclamation-triangle"></i> Due Today (${p.deadlineTime || '23:59'})!</span>`;
+    } else {
+      deadlineBadgeHtml = `<span class="cd-deadline-pill urgent"><i class="fas fa-history"></i> Passed (${Math.abs(daysDiff)} days ago)</span>`;
+    }
+  }
+
+  let freqLabel = 'Every 3 days';
+  if (p.notificationFrequency === 'daily') freqLabel = 'Daily';
+  else if (p.notificationFrequency === 'every_2_days') freqLabel = 'Every 2 days';
+  else if (p.notificationFrequency === 'every_3_days') freqLabel = 'Every 3 days';
+  else if (p.notificationFrequency === 'weekly') freqLabel = 'Weekly';
+  else if (p.notificationFrequency === 'custom') freqLabel = `Every ${p.customIntervalDays || 3} days`;
+
+  const members = p.members || [];
+
+  container.innerHTML = `
+    <div class="cd-proj-card">
+      <div class="cd-proj-top">
+        <div class="cd-proj-title-wrap">
+          <h4><i class="fas fa-rocket" style="color:var(--primary);margin-right:6px"></i>${esc(p.title)}</h4>
+          ${p.description ? `<p class="cd-proj-desc">${esc(p.description)}</p>` : ''}
+        </div>
+        <div class="cd-proj-actions">
+          <button class="btn-secondary btn-sm" onclick="openProjectModal(true)" title="Edit project details and stages">
+            <i class="fas fa-edit"></i> Edit
+          </button>
+          <button class="btn-secondary btn-sm" style="color:var(--danger)" onclick="deleteCourseProject()" title="Delete project">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Progress Bar -->
+      <div class="cd-progress-container">
+        <div class="cd-progress-info">
+          <span><i class="fas fa-chart-line"></i> Overall Project Progress</span>
+          <span class="cd-progress-pct">${pct}% (${completedStages}/${stages.length} milestones)</span>
+        </div>
+        <div class="cd-progress-track">
+          <div class="cd-progress-fill" style="width:${pct}%;"></div>
+        </div>
+      </div>
+
+      <!-- Deadline & Reminder Bar -->
+      <div class="cd-proj-meta-bar">
+        <div>${deadlineBadgeHtml}</div>
+        <div class="cd-notif-freq-pill" title="Automated notification reminder schedule">
+          <i class="fas fa-bell"></i> ${p.remindersEnabled !== false ? `Reminders: ${freqLabel}` : 'Reminders off'}
+        </div>
+      </div>
+
+      <!-- Milestones / Stages Checklist -->
+      <div>
+        <div class="cd-stages-header"><i class="fas fa-check-square"></i> Project Milestones &amp; Stages:</div>
+        <div class="cd-stages-list">
+          ${stages.length ? stages.map((s, idx) => `
+            <div class="cd-stage-item ${s.done ? 'done' : ''}" onclick="toggleCourseProjectStage(${idx})">
+              <div class="cd-stage-check">${s.done ? '<i class="fas fa-check"></i>' : ''}</div>
+              <span class="cd-stage-text">${esc(s.title)}</span>
+            </div>
+          `).join('') : '<div style="font-size:12px;color:var(--text-light);padding:8px 0;">No stages added yet. Edit project to add milestone stages.</div>'}
+        </div>
+      </div>
+
+      <!-- Collaborators & Team Members -->
+      <div class="cd-collaborators-wrap">
+        <div class="cd-collab-title"><i class="fas fa-users"></i> Assigned Collaborating Team Members:</div>
+        <div class="cd-members-chips">
+          ${members.length ? members.map(m => {
+            const initial = (m.name || 'M').charAt(0).toUpperCase();
+            return `
+              <div class="cd-member-chip">
+                <div class="cd-member-av">${initial}</div>
+                <span class="cd-member-name">${esc(m.name)}</span>
+                ${m.role ? `<span class="cd-member-role">${esc(m.role)}</span>` : ''}
+              </div>`;
+          }).join('') : '<span style="font-size:12px;color:var(--text-light);">No team members assigned yet. Click Edit to add collaborators.</span>'}
+        </div>
+      </div>
+    </div>`;
+}
+
+function openProjectModal(isEdit) {
+  const course = getCourseById(currentActiveCourseId);
+  if (!course) return;
+
+  document.getElementById('projCourseId').value = course.id;
+  const p = isEdit && course.project ? course.project : null;
+
+  document.getElementById('projModalTitle').innerHTML = p
+    ? '<i class="fas fa-edit"></i> Edit Course Project'
+    : '<i class="fas fa-project-diagram"></i> Set Up Course Project';
+
+  document.getElementById('projTitle').value = p ? p.title : '';
+  document.getElementById('projDesc').value = p ? (p.description || '') : '';
+  document.getElementById('projDeadlineDate').value = p ? (p.deadlineDate || '') : '';
+  document.getElementById('projDeadlineTime').value = p ? (p.deadlineTime || '23:59') : '23:59';
+
+  const freq = p ? (p.notificationFrequency || 'every_3_days') : 'every_3_days';
+  document.getElementById('projNotifFreq').value = freq;
+  document.getElementById('projCustomDays').value = p ? (p.customIntervalDays || 3) : 3;
+  toggleCustomFreqInput();
+
+  document.getElementById('projNotifEnabled').checked = p ? (p.remindersEnabled !== false) : true;
+
+  const stageList = document.getElementById('stageBuilderList');
+  if (stageList) stageList.innerHTML = '';
+  const memberList = document.getElementById('membersBuilderList');
+  if (memberList) memberList.innerHTML = '';
+
+  if (p && Array.isArray(p.stages) && p.stages.length) {
+    p.stages.forEach(s => addStageToBuilder(s.title, s.done));
+  } else if (!p) {
+    addStageToBuilder('Topic proposal & requirements', false);
+    addStageToBuilder('Core development & analysis', false);
+    addStageToBuilder('Final presentation & report submission', false);
+  }
+
+  if (p && Array.isArray(p.members) && p.members.length) {
+    p.members.forEach(m => addMemberToBuilder(m.name, m.role));
+  }
+
+  const pillsEl = document.getElementById('quickContactsPills');
+  if (pillsEl) {
+    const contacts = globalData.contacts || [];
+    if (contacts.length) {
+      pillsEl.innerHTML = contacts.map(c => `
+        <button type="button" class="btn-secondary btn-sm" style="font-size:11px;padding:3px 9px;border-radius:12px;margin:2px;" onclick="addMemberToBuilder('${esc(c.first + (c.last ? ' ' + c.last : ''))}', '${esc(c.role || 'Member')}')">
+          <i class="fas fa-plus"></i> ${esc(c.first)} (${esc(c.role || 'Contact')})
+        </button>
+      `).join('');
+    } else {
+      pillsEl.innerHTML = '<span style="font-size:11px;color:var(--text-light)">No saved contacts found. Add teammates above.</span>';
+    }
+  }
+
+  openModal('courseProjectModal');
+}
+
+function toggleCustomFreqInput() {
+  const sel = document.getElementById('projNotifFreq');
+  const group = document.getElementById('projCustomDaysGroup');
+  if (sel && group) {
+    group.classList.toggle('hidden', sel.value !== 'custom');
+  }
+}
+
+function addStageToBuilder(title = '', done = false) {
+  const list = document.getElementById('stageBuilderList');
+  if (!list) return;
+  const input = document.getElementById('newStageInput');
+  const stageTitle = title || (input ? input.value.trim() : '');
+  if (!stageTitle) return;
+
+  const item = document.createElement('div');
+  item.className = 'builder-item';
+  item.innerHTML = `
+    <span style="display:flex;align-items:center;gap:8px">
+      <input type="checkbox" class="builder-stage-done" ${done ? 'checked' : ''} style="width:15px;height:15px;cursor:pointer;"/>
+      <span class="builder-stage-text">${esc(stageTitle)}</span>
+    </span>
+    <button type="button" class="btn-secondary btn-sm" style="padding:2px 8px;color:var(--danger)" onclick="this.closest('.builder-item').remove()"><i class="fas fa-trash"></i></button>
+  `;
+  list.appendChild(item);
+  if (input && !title) input.value = '';
+}
+
+function addMemberToBuilder(name = '', role = '') {
+  const list = document.getElementById('membersBuilderList');
+  if (!list) return;
+  const nameInp = document.getElementById('newMemberName');
+  const roleInp = document.getElementById('newMemberRole');
+  const memberName = name || (nameInp ? nameInp.value.trim() : '');
+  const memberRole = role || (roleInp ? roleInp.value.trim() : 'Member');
+  if (!memberName) return;
+
+  const item = document.createElement('div');
+  item.className = 'builder-item';
+  item.innerHTML = `
+    <span style="display:flex;align-items:center;gap:8px">
+      <i class="fas fa-user-circle" style="color:var(--primary);font-size:14px"></i>
+      <strong class="builder-member-name">${esc(memberName)}</strong>
+      <span class="builder-member-role" style="color:var(--text-light);font-size:11px">(${esc(memberRole)})</span>
+    </span>
+    <button type="button" class="btn-secondary btn-sm" style="padding:2px 8px;color:var(--danger)" onclick="this.closest('.builder-item').remove()"><i class="fas fa-trash"></i></button>
+  `;
+  list.appendChild(item);
+  if (nameInp && !name) nameInp.value = '';
+  if (roleInp && !role) roleInp.value = '';
+}
+
+function saveCourseProject() {
+  const course = getCourseById(currentActiveCourseId);
+  if (!course) return;
+
+  const title = document.getElementById('projTitle').value.trim();
+  const deadlineDate = document.getElementById('projDeadlineDate').value;
+  if (!title) { showToast('⚠️ Project Title is required.'); return; }
+  if (!deadlineDate) { showToast('⚠️ Deadline date is required.'); return; }
+
+  const desc = document.getElementById('projDesc').value.trim();
+  const deadlineTime = document.getElementById('projDeadlineTime').value || '23:59';
+  const freq = document.getElementById('projNotifFreq').value;
+  const customDays = parseInt(document.getElementById('projCustomDays').value) || 3;
+  const remindersEnabled = document.getElementById('projNotifEnabled').checked;
+
+  const stages = [];
+  document.querySelectorAll('#stageBuilderList .builder-item').forEach(item => {
+    const textEl = item.querySelector('.builder-stage-text');
+    const cb = item.querySelector('.builder-stage-done');
+    if (textEl) {
+      stages.push({ title: textEl.textContent.trim(), done: cb ? cb.checked : false });
+    }
+  });
+
+  const members = [];
+  document.querySelectorAll('#membersBuilderList .builder-item').forEach(item => {
+    const nameEl = item.querySelector('.builder-member-name');
+    const roleEl = item.querySelector('.builder-member-role');
+    if (nameEl) {
+      const rawRole = roleEl ? roleEl.textContent.replace(/[()]/g, '').trim() : 'Member';
+      members.push({ name: nameEl.textContent.trim(), role: rawRole });
+    }
+  });
+
+  course.project = {
+    id: course.project?.id || uid(),
+    title,
+    description: desc,
+    deadlineDate,
+    deadlineTime,
+    stages,
+    members,
+    notificationFrequency: freq,
+    customIntervalDays: customDays,
+    remindersEnabled,
+    lastNotified: course.project?.lastNotified || 0
+  };
+
+  save();
+  renderCourseProject(course);
+  closeModal('courseProjectModal');
+  showToast('🚀 Project updated!');
+}
+
+function deleteCourseProject() {
+  const course = getCourseById(currentActiveCourseId);
+  if (!course || !course.project) return;
+  if (!confirm('Are you sure you want to delete this project?')) return;
+  course.project = null;
+  save();
+  renderCourseProject(course);
+  showToast('🗑️ Project removed.');
+}
+
+function toggleCourseProjectStage(idx) {
+  const course = getCourseById(currentActiveCourseId);
+  if (!course || !course.project || !course.project.stages) return;
+  if (course.project.stages[idx]) {
+    course.project.stages[idx].done = !course.project.stages[idx].done;
+    save();
+    renderCourseProject(course);
+    showToast(course.project.stages[idx].done ? '✅ Milestone completed!' : 'Milestone reopened.');
+  }
+}
+
+// ── Course Assignments & Deadlines ──
+function renderCourseAssignments(course) {
+  const list = document.getElementById('cdAssignmentsList');
+  const countEl = document.getElementById('cdAssignmentCount');
+  if (!course) return;
+
+  const assignments = course.assignments || [];
+  if (countEl) countEl.textContent = assignments.length;
+  if (!list) return;
+
+  if (!assignments.length) {
+    list.innerHTML = `
+      <div class="empty-state" style="padding:28px 16px;">
+        <i class="fas fa-clipboard-check"></i>
+        <p>No assignments or homework added yet for <b>${esc(course.title)}</b>.</p>
+        <button class="btn-primary btn-sm" onclick="openAddCourseAssignmentModal()">
+          <i class="fas fa-plus"></i> Add Assignment
+        </button>
+      </div>`;
+    return;
+  }
+
+  const sorted = [...assignments].sort((a, b) => {
+    if (a.done !== b.done) return a.done ? 1 : -1;
+    return (a.dueDate || '').localeCompare(b.dueDate || '');
+  });
+
+  list.innerHTML = sorted.map(a => {
+    const isOverdue = !a.done && a.dueDate && (a.dueDate < todayStr());
+    const isToday = !a.done && a.dueDate === todayStr();
+    const intervals = a.reminderIntervals || [];
+
+    return `
+      <div class="cd-assignment-item ${a.done ? 'done' : ''}">
+        <div class="cd-ass-check" onclick="toggleCourseAssignmentDone('${a.id}')" title="${a.done ? 'Mark as incomplete' : 'Mark as completed'}">
+          <i class="fas fa-check"></i>
+        </div>
+        <div class="cd-ass-content">
+          <div class="cd-ass-title">${esc(a.title)}</div>
+          <div class="cd-ass-meta">
+            <span class="cd-due-badge ${isOverdue || isToday ? 'urgent' : ''}">
+              <i class="fas fa-clock"></i> Due: ${formatDateShort(a.dueDate)} ${a.dueTime ? 'at ' + a.dueTime : ''}
+              ${isOverdue ? ' (Overdue)' : (isToday ? ' (Today!)' : '')}
+            </span>
+            ${a.priority === 'high' ? '<span class="ev-priority">🔴 Urgent</span>' : ''}
+            ${a.priority === 'low' ? '<span class="ev-priority">🟢 Low</span>' : ''}
+            ${a.duration ? `<span><i class="fas fa-hourglass-half"></i> ~${a.duration}m</span>` : ''}
+            ${intervals.length ? `
+              <div class="cd-rem-pills" title="Scheduled push notification reminders">
+                ${intervals.map(iv => `<span class="cd-rem-pill">🔔 ${iv}</span>`).join('')}
+              </div>` : ''}
+          </div>
+          ${a.notes ? `<div style="font-size:12px;color:var(--text-light);margin-top:4px;">${esc(a.notes)}</div>` : ''}
+        </div>
+        <div class="cd-ass-actions">
+          <button class="ev-btn del-btn" title="Delete Assignment" onclick="deleteCourseAssignment('${a.id}')">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function openAddCourseAssignmentModal(assignmentId = null) {
+  const course = getCourseById(currentActiveCourseId);
+  if (!course) return;
+
+  document.getElementById('caCourseId').value = course.id;
+  document.getElementById('caAssignmentId').value = assignmentId || '';
+
+  const a = assignmentId && course.assignments ? course.assignments.find(x => x.id === assignmentId) : null;
+  document.getElementById('caModalTitle').innerHTML = a
+    ? '<i class="fas fa-edit"></i> Edit Course Assignment'
+    : '<i class="fas fa-tasks"></i> Add Course Assignment';
+
+  document.getElementById('caTitle').value = a ? a.title : '';
+  document.getElementById('caDueDate').value = a ? a.dueDate : currentDate;
+  document.getElementById('caDueTime').value = a ? (a.dueTime || '23:59') : '23:59';
+  document.getElementById('caPriority').value = a ? (a.priority || 'normal') : 'normal';
+  document.getElementById('caDuration').value = a ? (a.duration || '') : '';
+  document.getElementById('caNotes').value = a ? (a.notes || '') : '';
+
+  const selectedIntervals = a ? (a.reminderIntervals || ['1d', '2h', '30m', 'due']) : ['1d', '2h', '30m', 'due'];
+  document.querySelectorAll('.ca-rem-cb').forEach(cb => {
+    cb.checked = selectedIntervals.includes(cb.value);
+  });
+
+  openModal('courseAssignmentModal');
+}
+
+function saveCourseAssignment() {
+  const course = getCourseById(currentActiveCourseId);
+  if (!course) return;
+
+  const title = document.getElementById('caTitle').value.trim();
+  const dueDate = document.getElementById('caDueDate').value;
+  if (!title) { showToast('⚠️ Assignment title is required.'); return; }
+  if (!dueDate) { showToast('⚠️ Due date is required.'); return; }
+
+  const dueTime = document.getElementById('caDueTime').value || '23:59';
+  const priority = document.getElementById('caPriority').value;
+  const duration = parseInt(document.getElementById('caDuration').value) || 0;
+  const notes = document.getElementById('caNotes').value.trim();
+  const assignmentId = document.getElementById('caAssignmentId').value;
+
+  const reminderIntervals = [];
+  document.querySelectorAll('.ca-rem-cb:checked').forEach(cb => reminderIntervals.push(cb.value));
+
+  if (!Array.isArray(course.assignments)) course.assignments = [];
+
+  const existingIdx = assignmentId ? course.assignments.findIndex(a => a.id === assignmentId) : -1;
+  const newOrUpdated = {
+    id: existingIdx >= 0 ? assignmentId : uid(),
+    title,
+    dueDate,
+    dueTime,
+    priority,
+    duration,
+    reminderIntervals,
+    notes,
+    done: existingIdx >= 0 ? course.assignments[existingIdx].done : false
+  };
+
+  if (existingIdx >= 0) {
+    course.assignments[existingIdx] = newOrUpdated;
+  } else {
+    course.assignments.push(newOrUpdated);
+  }
+
+  // Mirror into dayData(dueDate).tasks for unified assignment visibility
+  const dData = dayData(dueDate);
+  if (!Array.isArray(dData.tasks)) dData.tasks = [];
+  const taskTitle = `[${course.title}] ${title}`;
+  const tIdx = dData.tasks.findIndex(t => t.id === newOrUpdated.id);
+  if (tIdx >= 0) {
+    dData.tasks[tIdx].title = taskTitle;
+    dData.tasks[tIdx].text = taskTitle;
+    dData.tasks[tIdx].priority = priority;
+    dData.tasks[tIdx].duration = duration;
+    dData.tasks[tIdx].due = dueTime;
+  } else {
+    dData.tasks.push({
+      id: newOrUpdated.id,
+      title: taskTitle,
+      text: taskTitle,
+      cat: 'assignment',
+      priority,
+      duration,
+      due: dueTime,
+      notes,
+      done: false
+    });
+  }
+
+  save();
+  renderCourseAssignments(course);
+  renderTasks();
+  renderStats();
+  closeModal('courseAssignmentModal');
+  showToast('✅ Assignment saved & reminders scheduled!');
+}
+
+function toggleCourseAssignmentDone(assignmentId) {
+  const course = getCourseById(currentActiveCourseId);
+  if (!course || !course.assignments) return;
+
+  const a = course.assignments.find(x => x.id === assignmentId);
+  if (!a) return;
+  a.done = !a.done;
+
+  if (a.dueDate) {
+    const t = (dayData(a.dueDate).tasks || []).find(x => x.id === assignmentId);
+    if (t) t.done = a.done;
+  }
+
+  save();
+  renderCourseAssignments(course);
+  renderTasks();
+  renderStats();
+  showToast(a.done ? '🎉 Assignment completed!' : 'Assignment reopened.');
+}
+
+function deleteCourseAssignment(assignmentId) {
+  const course = getCourseById(currentActiveCourseId);
+  if (!course || !course.assignments) return;
+  if (!confirm('Delete this assignment?')) return;
+
+  const a = course.assignments.find(x => x.id === assignmentId);
+  course.assignments = course.assignments.filter(x => x.id !== assignmentId);
+
+  if (a && a.dueDate) {
+    const dData = dayData(a.dueDate);
+    if (dData.tasks) {
+      dData.tasks = dData.tasks.filter(x => x.id !== assignmentId);
+    }
+  }
+
+  save();
+  renderCourseAssignments(course);
+  renderTasks();
+  renderStats();
+  showToast('🗑️ Assignment deleted.');
+}
+
+// ── Course Personal Notes ──
+function renderCourseNotes(course) {
+  const grid = document.getElementById('cdNotesList');
+  const countEl = document.getElementById('cdNoteCount');
+  if (!course) return;
+
+  if (!Array.isArray(course.courseNotes)) course.courseNotes = [];
+  if (countEl) countEl.textContent = course.courseNotes.length;
+  if (!grid) return;
+
+  if (!course.courseNotes.length) {
+    grid.innerHTML = `
+      <div class="empty-state" style="grid-column:1/-1;padding:28px 16px;">
+        <i class="fas fa-book-open"></i>
+        <p>No notes written yet for <b>${esc(course.title)}</b>.<br>Keep lecture notes, formulas, and study reminders right here.</p>
+        <button class="btn-primary btn-sm" onclick="addCourseNote()">
+          <i class="fas fa-plus"></i> Create First Note
+        </button>
+      </div>`;
+    return;
+  }
+
+  grid.innerHTML = course.courseNotes.map(n => `
+    <div class="cd-note-card">
+      <div class="cd-note-header">
+        <span><i class="fas fa-sticky-note" style="color:var(--primary);margin-right:4px"></i>${esc(n.createdAt || '')}</span>
+        <button class="cd-note-del-btn" title="Delete Note" onclick="deleteCourseNote('${n.id}')">
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>
+      <textarea class="cd-note-textarea" placeholder="Type lecture notes, concepts, exam tips..." oninput="updateCourseNote('${n.id}', this.value)">${esc(n.text || '')}</textarea>
+    </div>
+  `).join('');
+}
+
+function addCourseNote() {
+  const course = getCourseById(currentActiveCourseId);
+  if (!course) return;
+  if (!Array.isArray(course.courseNotes)) course.courseNotes = [];
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  const newNote = {
+    id: uid(),
+    text: '',
+    createdAt: dateStr
+  };
+  course.courseNotes.unshift(newNote);
+  save();
+  renderCourseNotes(course);
+
+  setTimeout(() => {
+    const firstTextarea = document.querySelector('.cd-note-textarea');
+    if (firstTextarea) firstTextarea.focus();
+  }, 100);
+}
+
+function updateCourseNote(noteId, text) {
+  const course = getCourseById(currentActiveCourseId);
+  if (!course || !course.courseNotes) return;
+  const n = course.courseNotes.find(x => x.id === noteId);
+  if (n) {
+    n.text = text;
+    save();
+  }
+}
+
+function deleteCourseNote(noteId) {
+  const course = getCourseById(currentActiveCourseId);
+  if (!course || !course.courseNotes) return;
+  if (!confirm('Delete this note?')) return;
+  course.courseNotes = course.courseNotes.filter(x => x.id !== noteId);
+  save();
+  renderCourseNotes(course);
+  showToast('🗑️ Note deleted.');
+}
 
 // ══════════════════════════════════════════
 // PWA
 // ══════════════════════════════════════════
 function initPWA(){
-  if('serviceWorker'in navigator) {
+  if('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').then(reg => {
       reg.update();
     }).catch(()=>{});
-    if ('caches' in window) {
+
+    // Listen for messages from SW (e.g. notification click)
+    navigator.serviceWorker.addEventListener('message', e => {
+      if(e.data && e.data.type === 'OPEN_COURSE' && e.data.courseId){
+        openCourseDetails(e.data.courseId);
+      }
+    });
+
+    if('caches' in window) {
       caches.keys().then(keys => {
-        keys.forEach(k => { if (k !== 'ib-planner-v7') caches.delete(k); });
+        keys.forEach(k => { if(k !== 'ib-planner-v8') caches.delete(k); });
       });
     }
   }

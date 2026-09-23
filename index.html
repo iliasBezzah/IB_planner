@@ -14,7 +14,7 @@
   <link rel="manifest" href="manifest.json"/>
   <link rel="apple-touch-icon" href="icon-192.svg"/>
 
-  <link rel="stylesheet" href="style.css?v=7"/>
+  <link rel="stylesheet" href="style.css?v=8"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
 </head>
 <body>
@@ -680,9 +680,15 @@
         <input type="checkbox" id="settingReminders" checked style="width:18px;height:18px"/>
       </div>
       <div class="form-group">
-        <button type="button" class="btn-secondary full-width" onclick="requestNotifPermission()">
-          <i class="fas fa-bell"></i> Request Notification Permission
-        </button>
+        <div style="font-size:12px;color:var(--text-light);margin-bottom:6px" id="notifStatusText">Status: Checking permission…</div>
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="btn-secondary" style="flex:1" onclick="requestNotifPermission()">
+            <i class="fas fa-bell"></i> Request Permission
+          </button>
+          <button type="button" class="btn-primary" style="flex:1" onclick="testNotification()">
+            <i class="fas fa-paper-plane"></i> Test Notification
+          </button>
+        </div>
       </div>
 
       <!-- Install App Inside Settings -->
@@ -809,6 +815,228 @@
   </div>
 </div>
 
+<!-- ══════════════ COURSE DETAILS MODAL ══════════════ -->
+<div class="modal-overlay" id="courseDetailsModal">
+  <div class="modal modal-lg course-modal">
+    <div class="modal-header course-header">
+      <div class="course-header-left">
+        <div class="course-cat-badge" id="cdCatBadge">🎓 Lecture</div>
+        <h2 id="cdTitle" class="course-title">Course Details</h2>
+        <div class="course-schedule-pill" id="cdSchedulePill">
+          <i class="fas fa-clock"></i> <span id="cdTime">08:00 – 10:00</span>
+          <span class="cd-pill-sep">&bull;</span>
+          <i class="fas fa-map-marker-alt"></i> <span id="cdLocation">Classroom</span>
+        </div>
+      </div>
+      <div class="course-header-actions">
+        <button class="btn-secondary btn-sm" type="button" onclick="editCurrentCourseSchedule()" title="Edit class schedule, repeat rule, and location">
+          <i class="fas fa-calendar-alt"></i> Edit Schedule
+        </button>
+        <button class="modal-close" onclick="closeModal('courseDetailsModal')"><i class="fas fa-times"></i></button>
+      </div>
+    </div>
+
+    <!-- Course Navigation Tabs -->
+    <div class="course-tabs">
+      <button class="course-tab-btn active" data-tab="project" onclick="switchCourseTab('project')">
+        <i class="fas fa-project-diagram"></i> <span>Project Tracker</span>
+      </button>
+      <button class="course-tab-btn" data-tab="assignments" onclick="switchCourseTab('assignments')">
+        <i class="fas fa-tasks"></i> <span>Assignments (<span id="cdAssignmentCount">0</span>)</span>
+      </button>
+      <button class="course-tab-btn" data-tab="notes" onclick="switchCourseTab('notes')">
+        <i class="fas fa-book-open"></i> <span>Course Notes (<span id="cdNoteCount">0</span>)</span>
+      </button>
+    </div>
+
+    <div class="modal-body course-modal-body">
+      <!-- TAB 1: Project & Collaboration Tracker -->
+      <div class="course-tab-panel active" id="cdPanelProject">
+        <div id="cdProjectContainer"></div>
+      </div>
+
+      <!-- TAB 2: Assignments & Deadlines -->
+      <div class="course-tab-panel" id="cdPanelAssignments">
+        <div class="cd-section-head">
+          <div>
+            <h3><i class="fas fa-clipboard-list"></i> Course Assignments &amp; Deadlines</h3>
+            <p style="font-size:12px;color:var(--text-light);margin-top:2px">Track homework, labs, and deadlines with recurring push notifications.</p>
+          </div>
+          <button class="btn-primary btn-sm" onclick="openAddCourseAssignmentModal()">
+            <i class="fas fa-plus"></i> Add Assignment
+          </button>
+        </div>
+        <div id="cdAssignmentsList" class="cd-assignments-list"></div>
+      </div>
+
+      <!-- TAB 3: Course Notes Notebook -->
+      <div class="course-tab-panel" id="cdPanelNotes">
+        <div class="cd-section-head">
+          <div>
+            <h3><i class="fas fa-sticky-note"></i> Personal Course Notebook</h3>
+            <p style="font-size:12px;color:var(--text-light);margin-top:2px">Store lecture notes, exam tips, and study concepts specifically for this course.</p>
+          </div>
+          <button class="btn-primary btn-sm" onclick="addCourseNote()">
+            <i class="fas fa-plus"></i> New Note
+          </button>
+        </div>
+        <div id="cdNotesList" class="cd-notes-grid"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ COURSE PROJECT MODAL ══════════════ -->
+<div class="modal-overlay" id="courseProjectModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3 id="projModalTitle"><i class="fas fa-project-diagram"></i> Course Project Tracker</h3>
+      <button class="modal-close" onclick="closeModal('courseProjectModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="projCourseId"/>
+      <div class="form-group">
+        <label>Project Title *</label>
+        <input type="text" id="projTitle" placeholder="e.g. Data Structures Term Project: AVL Tree Benchmark"/>
+      </div>
+      <div class="form-group">
+        <label>Project Overview / Objectives</label>
+        <textarea id="projDesc" rows="2" placeholder="Brief project summary, objectives, deliverables, repository link…"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Final Deadline Date *</label>
+          <input type="date" id="projDeadlineDate"/>
+        </div>
+        <div class="form-group">
+          <label>Due Time</label>
+          <input type="time" id="projDeadlineTime" value="23:59"/>
+        </div>
+      </div>
+
+      <!-- Project Milestones / Stages -->
+      <div class="form-group">
+        <label><i class="fas fa-tasks"></i> Project Milestones / Stages (Calculates Progress %)</label>
+        <div class="stage-builder-list" id="stageBuilderList"></div>
+        <div class="add-stage-row">
+          <input type="text" id="newStageInput" placeholder="Add milestone (e.g. Topic proposal, Core development, Testing, Report)…" onkeydown="if(event.key==='Enter'){event.preventDefault();addStageToBuilder();}"/>
+          <button class="btn-secondary btn-sm" type="button" onclick="addStageToBuilder()"><i class="fas fa-plus"></i> Add Stage</button>
+        </div>
+      </div>
+
+      <!-- Collaborating Team Members -->
+      <div class="form-group">
+        <label><i class="fas fa-users"></i> Assigned Collaborating Team Members</label>
+        <div class="members-builder-list" id="membersBuilderList"></div>
+        <div class="add-member-row">
+          <input type="text" id="newMemberName" placeholder="Teammate name…"/>
+          <input type="text" id="newMemberRole" placeholder="Role (e.g. Lead, Frontend, Tester, Slides)"/>
+          <button class="btn-secondary btn-sm" type="button" onclick="addMemberToBuilder()"><i class="fas fa-user-plus"></i> Add Member</button>
+        </div>
+        <div class="quick-contacts-wrap" id="quickContactsWrap" style="margin-top:8px">
+          <small style="color:var(--text-light);font-size:11px;display:block;margin-bottom:4px">Quick pick from your contacts:</small>
+          <div class="quick-contacts-pills" id="quickContactsPills"></div>
+        </div>
+      </div>
+
+      <!-- Custom Reminder Frequency -->
+      <div class="form-group" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+        <label style="font-weight:700;color:var(--primary);margin-bottom:8px;display:flex;align-items:center;gap:6px">
+          <i class="fas fa-bell"></i> Push Notification Reminders for Updates &amp; Deadlines
+        </label>
+        <div class="form-row" style="align-items:center;">
+          <div class="form-group" style="margin:0;flex:1;">
+            <label style="font-size:11px;color:var(--text-light);">Reminder Interval</label>
+            <select id="projNotifFreq" onchange="toggleCustomFreqInput()">
+              <option value="daily">🔔 Every day</option>
+              <option value="every_2_days">🔔 Every 2 days</option>
+              <option value="every_3_days" selected>🔔 Every 3 days</option>
+              <option value="weekly">🔔 Once a week</option>
+              <option value="custom">🔔 Custom Interval (days)</option>
+            </select>
+          </div>
+          <div class="form-group hidden" id="projCustomDaysGroup" style="margin:0;width:120px;">
+            <label style="font-size:11px;color:var(--text-light);">Every N Days</label>
+            <input type="number" id="projCustomDays" min="1" max="60" value="3" placeholder="Days"/>
+          </div>
+        </div>
+        <label class="checkbox-row" style="margin-top:10px;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer;">
+          <input type="checkbox" id="projNotifEnabled" checked style="width:16px;height:16px;"/>
+          <span>Send automated push notifications for progress tracking and deadline countdown</span>
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('courseProjectModal')">Cancel</button>
+      <button class="btn-primary" onclick="saveCourseProject()"><i class="fas fa-save"></i> Save Project</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ COURSE ASSIGNMENT MODAL ══════════════ -->
+<div class="modal-overlay" id="courseAssignmentModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="caModalTitle"><i class="fas fa-tasks"></i> Add Course Assignment</h3>
+      <button class="modal-close" onclick="closeModal('courseAssignmentModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="caCourseId"/>
+      <input type="hidden" id="caAssignmentId"/>
+      <div class="form-group">
+        <label>Assignment Title *</label>
+        <input type="text" id="caTitle" placeholder="e.g. Lab 4: Binary Trees, Essay 2"/>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Due Date *</label>
+          <input type="date" id="caDueDate"/>
+        </div>
+        <div class="form-group">
+          <label>Due Time</label>
+          <input type="time" id="caDueTime" value="23:59"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Priority</label>
+          <select id="caPriority">
+            <option value="normal">Normal</option>
+            <option value="high">🔴 Urgent</option>
+            <option value="low">🟢 Low</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Estimated Workload (min)</label>
+          <input type="number" id="caDuration" placeholder="e.g. 90" min="5"/>
+        </div>
+      </div>
+
+      <!-- Automated Recurring Deadline Reminders -->
+      <div class="form-group">
+        <label><i class="fas fa-stopwatch"></i> Automated Deadline Reminders</label>
+        <p style="font-size:11px;color:var(--text-light);margin-bottom:8px">Select notification intervals leading up to this deadline:</p>
+        <div class="reminder-intervals-grid">
+          <label class="interval-chip"><input type="checkbox" class="ca-rem-cb" value="1d" checked/> 1 day before</label>
+          <label class="interval-chip"><input type="checkbox" class="ca-rem-cb" value="12h"/> 12 hours before</label>
+          <label class="interval-chip"><input type="checkbox" class="ca-rem-cb" value="2h" checked/> 2 hours before</label>
+          <label class="interval-chip"><input type="checkbox" class="ca-rem-cb" value="30m" checked/> 30 mins before</label>
+          <label class="interval-chip"><input type="checkbox" class="ca-rem-cb" value="due" checked/> At deadline</label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Instructions &amp; Requirements</label>
+        <textarea id="caNotes" rows="2" placeholder="Submission portal, guidelines, format requirements…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('courseAssignmentModal')">Cancel</button>
+      <button class="btn-primary" onclick="saveCourseAssignment()"><i class="fas fa-save"></i> Save Assignment</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -823,7 +1051,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js?v=7"></script>
-<script src="app.js?v=7"></script>
+<script src="firebase-config.js?v=8"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>

@@ -2,7 +2,7 @@
    ║  IB Day Programme — Service Worker (PWA Offline)    ║
    ╚══════════════════════════════════════════════════════╝ */
 
-const CACHE_NAME = 'ib-planner-v7';
+const CACHE_NAME = 'ib-planner-v8';
 const ASSETS = [
   './',
   './index.html',
@@ -12,7 +12,6 @@ const ASSETS = [
   './firebase-config.js',
   './manifest.json',
   './icon-192.svg',
-  './icon-512.svg',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css'
 ];
 
@@ -59,15 +58,17 @@ self.addEventListener('fetch', e => {
   );
 });
 
-// ─── Push Notifications ───
+// ─── Push Notifications from Server ───
 self.addEventListener('push', e => {
   let title = 'IB Student Planner';
   let body  = 'Upcoming class or task reminder!';
+  let data  = { url: './index.html' };
   if (e.data) {
     try {
       const d = e.data.json();
       title = d.title || title;
       body  = d.body  || body;
+      data  = d.data  || data;
     } catch {
       body = e.data.text();
     }
@@ -77,19 +78,47 @@ self.addEventListener('push', e => {
       body,
       icon: './icon-192.svg',
       badge: './icon-192.svg',
-      vibrate: [200, 100, 200]
+      vibrate: [200, 100, 200],
+      data
     })
   );
 });
 
+// ─── Message from Client Page to Dispatch Notification ───
+self.addEventListener('message', e => {
+  if (e.data && e.data.type === 'SHOW_NOTIFICATION') {
+    const { title, options } = e.data;
+    e.waitUntil(
+      self.registration.showNotification(title || 'IB Student Planner', {
+        body: options?.body || '',
+        icon: options?.icon || './icon-192.svg',
+        badge: options?.badge || './icon-192.svg',
+        vibrate: options?.vibrate || [200, 100, 200],
+        tag: options?.tag || 'ib-alert-' + Date.now(),
+        data: options?.data || { url: './index.html' }
+      })
+    );
+  }
+});
+
+// ─── Notification Click Handler ───
 self.addEventListener('notificationclick', e => {
   e.notification.close();
+  const targetUrl = e.notification.data?.url || './index.html';
   e.waitUntil(
-    clients.matchAll({ type: 'window' }).then(clientList => {
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
       for (const client of clientList) {
-        if (client.url && 'focus' in client) return client.focus();
+        if (client.url && 'focus' in client) {
+          if (e.notification.data?.courseId && 'postMessage' in client) {
+            client.postMessage({
+              type: 'OPEN_COURSE',
+              courseId: e.notification.data.courseId
+            });
+          }
+          return client.focus();
+        }
       }
-      if (clients.openWindow) return clients.openWindow('./index.html');
+      if (clients.openWindow) return clients.openWindow(targetUrl);
     })
   );
 });
