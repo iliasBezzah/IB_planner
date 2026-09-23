@@ -561,7 +561,10 @@ function switchView(v) {
     s.classList.toggle('active', s.id === 'view-' + v);
   });
 
-  if (v === 'dashboard')  { refreshAll(); }
+  if (v === 'dashboard')  {
+    refreshAll();
+    applyRoleUI();
+  }
   else if (v === 'week')  { renderWeek(); }
   else if (v === 'month') { renderMonth(); }
   else if (v === 'timeline') { renderTimeline(); }
@@ -596,6 +599,9 @@ function refreshAll() {
   loadMoodUI();
   loadEnergyUI();
   renderGoals();
+  if (isTeacherRole()) {
+    renderTeacherDashboard();
+  }
 }
 function updateDayLabel() {
   document.getElementById('dayLabel').textContent = formatDateLong(currentDate);
@@ -917,6 +923,7 @@ function renderSchedule() {
         <div class="ev-title">
           ${CAT_ICONS[ev.cat] || '📌'} ${esc(ev.title)}
           ${ev.isRecurring ? '<span class="ev-recurring-badge"><i class="fas fa-redo"></i> Routine</span>' : ''}
+          ${ev.classCode ? `<span class="badge-enrolled-course" title="Class Code: ${esc(ev.classCode)}"><i class="fas fa-university"></i> ${esc(ev.instructorName || ev.classCode)}</span>` : ''}
         </div>
         <div class="ev-meta">
           <span class="ev-time"><i class="fas fa-clock"></i> ${ev.start}–${ev.end} (${dur(ev.start, ev.end)})</span>
@@ -1753,6 +1760,27 @@ function collectAllActivityNotifications() {
     });
   });
 
+  // Also collect broadcast announcements from courses
+  (globalData.recurring || []).forEach(c => {
+    (c.announcements || []).forEach(ann => {
+      if (ann && ann.id && !seenIds.has(ann.id)) {
+        seenIds.add(ann.id);
+        list.push({
+          id: ann.id,
+          projectId: c.projectId || '',
+          courseId: c.id,
+          courseTitle: c.title,
+          projectTitle: c.title,
+          type: 'announcement',
+          text: `📢 ${ann.title}: ${ann.text}`,
+          byUser: ann.byUser || 'Instructor',
+          isSelf: ann.byUser === myName,
+          timestamp: ann.timestamp || Date.now()
+        });
+      }
+    });
+  });
+
   return list.sort((a, b) => b.timestamp - a.timestamp);
 }
 
@@ -1799,6 +1827,9 @@ function updateNotificationCenter() {
       iconMod = 'invite';
     } else if (n.type === 'milestone_reopened') {
       iconClass = 'fas fa-undo';
+    } else if (n.type === 'announcement') {
+      iconClass = 'fas fa-bullhorn';
+      iconMod = 'invite';
     }
 
     return `
@@ -2908,6 +2939,944 @@ function deleteCourseNote(noteId) {
 }
 
 // ══════════════════════════════════════════
+// ROLE-BASED ARCHITECTURE & ACADEMIC CLASSROOMS
+// ══════════════════════════════════════════
+let classroomsUnsubscribe = null;
+let teacherSelectedColor = '#1565C0';
+
+function isTeacherRole() {
+  const u = getCurrentUser() || CURRENT_USER;
+  return u && u.role === 'teacher';
+}
+
+function applyRoleUI() {
+  const isTeacher = isTeacherRole();
+
+  // 1. Header Subtitle
+  const sub = document.getElementById('brandSub');
+  if (sub) {
+    sub.textContent = isTeacher ? 'Academic Portal: Instructor Hub' : 'Full Day Academic Manager';
+  }
+
+  // 2. Header Action Buttons
+  const createBtn = document.getElementById('btnCreateClassHeader');
+  const joinBtn = document.getElementById('btnJoinClassHeader');
+  if (createBtn) createBtn.classList.toggle('hidden', !isTeacher);
+  if (joinBtn) joinBtn.classList.toggle('hidden', isTeacher);
+
+  // 3. Top Navigation Labels & Icons
+  const navMap = isTeacher ? {
+    dashboard: { icon: 'fa-university', text: ' Academic Hub' },
+    week:      { icon: 'fa-calendar-week', text: ' Schedule' },
+    month:     { icon: 'fa-calendar-alt', text: ' Calendar' },
+    timeline:  { icon: 'fa-stream', text: ' Timeline' },
+    tasks:     { icon: 'fa-tasks', text: ' Assignments' },
+    notes:     { icon: 'fa-sticky-note', text: ' Notes' },
+    contacts:  { icon: 'fa-user-graduate', text: ' Students' },
+    analytics: { icon: 'fa-chart-bar', text: ' Analytics' }
+  } : {
+    dashboard: { icon: 'fa-th-large', text: ' My Day' },
+    week:      { icon: 'fa-calendar-week', text: ' Week' },
+    month:     { icon: 'fa-calendar-alt', text: ' Month' },
+    timeline:  { icon: 'fa-stream', text: ' Timeline' },
+    tasks:     { icon: 'fa-tasks', text: ' Assignments' },
+    notes:     { icon: 'fa-sticky-note', text: ' Notes' },
+    contacts:  { icon: 'fa-user-graduate', text: ' People' },
+    analytics: { icon: 'fa-chart-bar', text: ' Analytics' }
+  };
+
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    const v = btn.dataset.view;
+    if (navMap[v]) {
+      const iEl = btn.querySelector('i');
+      const sEl = btn.querySelector('.nav-text');
+      if (iEl) iEl.className = 'fas ' + navMap[v].icon;
+      if (sEl) sEl.textContent = navMap[v].text;
+    }
+  });
+
+  // 4. Toggle Dashboard View Containers
+  const stuWidgets = document.getElementById('studentDashboardWidgets');
+  const tchHub = document.getElementById('teacherDashboardHub');
+  if (stuWidgets) stuWidgets.classList.toggle('hidden', isTeacher);
+  if (tchHub) tchHub.classList.toggle('hidden', !isTeacher);
+
+  if (isTeacher) {
+    renderTeacherDashboard();
+  }
+}
+
+function generateClassCode(title = '') {
+  let prefix = (title || 'CLASS')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, 4);
+  if (prefix.length < 2) prefix = 'IB' + prefix;
+  const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  let rand = '';
+  for (let i = 0; i < 3; i++) {
+    rand += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `${prefix}-${rand}`;
+}
+
+function selectTeacherCourseColor(c, el) {
+  teacherSelectedColor = c;
+  document.querySelectorAll('#tcColorPicker .color-dot').forEach(d => {
+    d.classList.toggle('selected', d === el || d.dataset.color === c);
+  });
+}
+
+function generateNewClassCodeInput() {
+  const title = document.getElementById('tcTitle')?.value || '';
+  const code = generateClassCode(title);
+  const inp = document.getElementById('tcCustomCode');
+  if (inp) inp.value = code;
+  return code;
+}
+
+function openCreateClassroomModal(editCourseId = null) {
+  document.getElementById('editClassroomId').value = editCourseId || '';
+  const isEdit = !!editCourseId;
+  const course = isEdit ? (globalData.recurring || []).find(r => r.id === editCourseId) : null;
+
+  document.getElementById('ccModalTitle').innerHTML = isEdit
+    ? '<i class="fas fa-edit"></i> Edit Academic Course'
+    : '<i class="fas fa-university"></i> Create Academic Course';
+
+  document.getElementById('tcTitle').value = course ? course.title : '';
+  document.getElementById('tcCat').value = course ? (course.cat || 'lecture') : 'lecture';
+  teacherSelectedColor = course ? (course.color || '#1565C0') : '#1565C0';
+  document.querySelectorAll('#tcColorPicker .color-dot').forEach(d => {
+    d.classList.toggle('selected', d.dataset.color === teacherSelectedColor);
+  });
+
+  document.getElementById('tcStart').value = course ? course.start : '09:00';
+  document.getElementById('tcEnd').value = course ? course.end : '10:30';
+
+  const defaultDays = course ? (course.days || [1, 3]) : [1, 3];
+  document.querySelectorAll('.tc-wday-cb').forEach(cb => {
+    cb.checked = defaultDays.includes(parseInt(cb.value));
+  });
+
+  document.getElementById('tcLocation').value = course ? (course.location || '') : '';
+  document.getElementById('tcCustomCode').value = course ? (course.classCode || '') : generateClassCode();
+  document.getElementById('tcDesc').value = course ? (course.description || '') : '';
+
+  openModal('createClassroomModal');
+}
+
+async function saveTeacherClassroom() {
+  const title = document.getElementById('tcTitle').value.trim();
+  if (!title) { showToast('⚠️ Course title is required.'); return; }
+
+  const start = document.getElementById('tcStart').value;
+  const end = document.getElementById('tcEnd').value;
+  if (!start || !end) { showToast('⚠️ Class start and end times required.'); return; }
+
+  const days = [];
+  document.querySelectorAll('.tc-wday-cb:checked').forEach(cb => days.push(parseInt(cb.value)));
+  if (!days.length) { showToast('⚠️ Please select at least one meeting day.'); return; }
+
+  let classCode = document.getElementById('tcCustomCode').value.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
+  if (!classCode) classCode = generateClassCode(title);
+
+  const editId = document.getElementById('editClassroomId').value;
+  const u = getCurrentUser() || CURRENT_USER || {};
+  const instructorUid = u.uid || '';
+  const instructorName = u.displayName || u.name || 'Instructor';
+  const instructorUsername = u.username || '';
+
+  const courseId = editId || uid();
+  const existingCourse = (globalData.recurring || []).find(r => r.id === courseId);
+
+  const courseObj = {
+    id: courseId,
+    title,
+    cat: document.getElementById('tcCat').value,
+    color: teacherSelectedColor,
+    start,
+    end,
+    days,
+    freq: 'weekly',
+    startDate: existingCourse?.startDate || todayStr(),
+    endDate: existingCourse?.endDate || null,
+    location: document.getElementById('tcLocation').value.trim(),
+    description: document.getElementById('tcDesc').value.trim(),
+    classCode,
+    instructorUid,
+    instructorName,
+    instructorUsername,
+    isTaughtCourse: true,
+    enrolledStudents: existingCourse?.enrolledStudents || [],
+    studentUids: existingCourse?.studentUids || [],
+    assignments: existingCourse?.assignments || [],
+    announcements: existingCourse?.announcements || [],
+    courseNotes: existingCourse?.courseNotes || [],
+    updatedAt: new Date().toISOString()
+  };
+
+  saveRecurring(courseObj);
+
+  // Sync to Firestore classrooms/{classCode}
+  if (typeof firebase !== 'undefined' && firebase.apps.length) {
+    try {
+      await firebase.firestore().collection('classrooms').doc(classCode).set(courseObj, { merge: true });
+    } catch (e) {
+      console.warn('Classroom cloud save note (cached locally):', e);
+    }
+  }
+
+  closeModal('createClassroomModal');
+  refreshAll();
+  showToast(`🎓 Academic Course "${title}" saved! Class Code: ${classCode}`, 4500);
+}
+
+function copyClassCode(code) {
+  if (!code) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(code).then(() => {
+      showToast(`📋 Class Code "${code}" copied to clipboard!`);
+    }).catch(() => {
+      prompt('Copy class code:', code);
+    });
+  } else {
+    prompt('Copy class code:', code);
+  }
+}
+
+function copyClassInviteLink(code) {
+  if (!code) return;
+  const baseUrl = window.location.origin + window.location.pathname;
+  const url = `${baseUrl}?join=${encodeURIComponent(code)}`;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => {
+      showToast(`🔗 Invite Link copied to clipboard!`);
+    }).catch(() => {
+      prompt('Copy invitation link:', url);
+    });
+  } else {
+    prompt('Copy invitation link:', url);
+  }
+}
+
+function renderTeacherDashboard() {
+  const isTeacher = isTeacherRole();
+  if (!isTeacher) return;
+
+  const courses = (globalData.recurring || []).filter(r => r.isTaughtCourse || r.classCode);
+
+  // Calculate metrics
+  const uniqueStudents = new Set();
+  let totalAssignments = 0;
+  let totalAnnouncements = 0;
+
+  courses.forEach(c => {
+    (c.studentUids || []).forEach(uid => uniqueStudents.add(uid));
+    totalAssignments += (c.assignments || []).length;
+    totalAnnouncements += (c.announcements || []).length;
+  });
+
+  const todayEvents = getEventsForDate(currentDate).filter(e => e.isTaughtCourse || courses.some(c => c.id === (e.recurId || e.id)));
+
+  // Update Stat counters
+  const elCourses = document.getElementById('teacherStatCourses');
+  const elStudents = document.getElementById('teacherStatStudents');
+  const elAssignments = document.getElementById('teacherStatAssignments');
+  const elAnnouncements = document.getElementById('teacherStatAnnouncements');
+  const elTodayClasses = document.getElementById('teacherStatTodayClasses');
+
+  if (elCourses) elCourses.textContent = courses.length;
+  if (elStudents) elStudents.textContent = uniqueStudents.size;
+  if (elAssignments) elAssignments.textContent = totalAssignments;
+  if (elAnnouncements) elAnnouncements.textContent = totalAnnouncements;
+  if (elTodayClasses) elTodayClasses.textContent = todayEvents.length;
+
+  // Populate Quick Announcement select
+  const quickSelect = document.getElementById('quickAnnounceCourseSelect');
+  if (quickSelect) {
+    quickSelect.innerHTML = '<option value="">Select course to broadcast…</option>' +
+      courses.map(c => `<option value="${c.classCode || c.id}">${esc(c.title)} (${c.classCode || 'No Code'})</option>`).join('');
+  }
+
+  // Populate Today's Teaching Schedule
+  const todayListEl = document.getElementById('teacherTodayClassesList');
+  if (todayListEl) {
+    if (!todayEvents.length) {
+      todayListEl.innerHTML = `
+        <div style="font-size:12px;color:var(--text-light);padding:14px 10px;text-align:center">
+          <i class="fas fa-mug-hot" style="font-size:20px;margin-bottom:6px;display:block;opacity:0.6"></i>
+          No lectures or sessions scheduled for today (${formatDateShort(currentDate)}).
+        </div>`;
+    } else {
+      todayListEl.innerHTML = todayEvents.map(e => `
+        <div class="teacher-today-item" onclick="openCourseDetails('${e.recurId || e.id}')" style="cursor:pointer" title="Click to view course hub">
+          <div>
+            <div class="tti-title">${CAT_ICONS[e.cat] || '🎓'} ${esc(e.title)}</div>
+            <div class="tti-meta">
+              <span><i class="fas fa-clock"></i> ${e.start}–${e.end}</span>
+              ${e.location ? `<span><i class="fas fa-map-marker-alt"></i> ${esc(e.location)}</span>` : ''}
+              ${e.classCode ? `<span><i class="fas fa-key"></i> ${esc(e.classCode)}</span>` : ''}
+            </div>
+          </div>
+          <button class="btn-secondary btn-sm" onclick="event.stopPropagation(); openCourseDetails('${e.recurId || e.id}')">
+            View
+          </button>
+        </div>
+      `).join('');
+    }
+  }
+
+  // Populate Course Hub Grid
+  const gridEl = document.getElementById('teacherCoursesGrid');
+  if (!gridEl) return;
+
+  if (!courses.length) {
+    gridEl.innerHTML = `
+      <div class="empty-state" style="padding:36px 16px;">
+        <i class="fas fa-university"></i>
+        <h3>No Academic Courses Created Yet</h3>
+        <p>Set up your first course to generate a unique Class Code, distribute it to your students, and publish assignments.</p>
+        <button class="btn-primary" onclick="openCreateClassroomModal()">
+          <i class="fas fa-plus"></i> Create Academic Course
+        </button>
+      </div>`;
+    return;
+  }
+
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  gridEl.innerHTML = courses.map(c => {
+    const studentCount = (c.enrolledStudents || c.studentUids || []).length;
+    const assignmentCount = (c.assignments || []).length;
+    const daysStr = (c.days || []).map(d => dayNames[d]).join(', ');
+
+    return `
+      <div class="teacher-course-card" style="border-left-color:${c.color || '#1565C0'}">
+        <div class="tcc-top-row">
+          <div class="tcc-title-wrap">
+            <div class="tcc-title">
+              <span>${CAT_ICONS[c.cat] || '🎓'} ${esc(c.title)}</span>
+              <span class="ev-cat-badge" style="background:${c.color || '#1565C0'}">${esc(c.cat || 'Lecture')}</span>
+            </div>
+            <div class="tcc-meta-row">
+              <span class="tcc-meta-item"><i class="fas fa-clock"></i> ${c.start}–${c.end} (${daysStr || 'Weekly'})</span>
+              ${c.location ? `<span class="tcc-meta-item"><i class="fas fa-map-marker-alt"></i> ${esc(c.location)}</span>` : ''}
+            </div>
+          </div>
+          <button class="btn-secondary btn-sm" onclick="openCreateClassroomModal('${c.id}')" title="Edit course settings">
+            <i class="fas fa-cog"></i> Settings
+          </button>
+        </div>
+
+        <!-- Prominent Class Code Banner with 1-Click Copy -->
+        <div class="tcc-code-banner">
+          <div class="tcc-code-info">
+            <i class="fas fa-key" style="color:var(--primary)"></i>
+            <span class="tcc-code-label">Student Class Code:</span>
+            <span class="tcc-code-tag">${esc(c.classCode || 'NONE')}</span>
+          </div>
+          <div class="tcc-code-btns">
+            <button class="btn-code-copy" onclick="copyClassCode('${c.classCode}')" title="Copy code for syllabus / board">
+              <i class="fas fa-copy"></i> Copy Code
+            </button>
+            <button class="btn-code-copy" onclick="copyClassInviteLink('${c.classCode}')" title="Copy direct enrollment link">
+              <i class="fas fa-link"></i> Invite Link
+            </button>
+          </div>
+        </div>
+
+        <!-- Enrollment & Material Stats -->
+        <div class="tcc-stats-bar">
+          <span class="tcc-stat-pill students" onclick="openClassRosterModal('${c.classCode || c.id}')" style="cursor:pointer" title="Click to view student list">
+            <i class="fas fa-users"></i> ${studentCount} Enrolled Student${studentCount !== 1 ? 's' : ''}
+          </span>
+          <span class="tcc-stat-pill assignments">
+            <i class="fas fa-clipboard-check"></i> ${assignmentCount} Assignment${assignmentCount !== 1 ? 's' : ''}
+          </span>
+          ${(c.announcements || []).length ? `
+            <span class="tcc-stat-pill">
+              <i class="fas fa-bullhorn"></i> ${(c.announcements || []).length} Announcements
+            </span>` : ''}
+        </div>
+
+        <!-- Teacher Actions Grid -->
+        <div class="tcc-actions-grid">
+          <button class="btn-tcc-action" onclick="openPublishAssignmentModal('${c.id}', '${c.classCode || ''}')" title="Create course-wide assignment">
+            <i class="fas fa-plus"></i> Assignment
+          </button>
+          <button class="btn-tcc-action" onclick="openPostAnnouncementModal('${c.id}', '${c.classCode || ''}')" title="Broadcast announcement to students">
+            <i class="fas fa-bullhorn"></i> Announcement
+          </button>
+          <button class="btn-tcc-action" onclick="openCourseDetails('${c.id}')" title="Open full course details & notes">
+            <i class="fas fa-folder-open"></i> Course View
+          </button>
+          <button class="btn-tcc-action" onclick="openClassRosterModal('${c.classCode || c.id}')" title="View enrolled students">
+            <i class="fas fa-user-graduate"></i> Roster
+          </button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── Publish Course Assignment (Teacher) ──
+function openPublishAssignmentModal(courseId, classCode) {
+  const course = (globalData.recurring || []).find(r => r.id === courseId || r.classCode === classCode);
+  if (!course) return;
+
+  document.getElementById('paCourseId').value = course.id;
+  document.getElementById('paClassCode').value = course.classCode || classCode || '';
+  document.getElementById('paCourseTitleDisplay').textContent = `${course.title} (${course.classCode || ''})`;
+
+  document.getElementById('paTitle').value = '';
+  document.getElementById('paDue').value = offset(todayStr(), 7);
+  document.getElementById('paDueTime').value = '23:59';
+  document.getElementById('paPriority').value = 'normal';
+  document.getElementById('paDuration').value = '60';
+  document.getElementById('paNotes').value = '';
+
+  openModal('publishAssignmentModal');
+}
+
+async function submitPublishAssignment() {
+  const courseId = document.getElementById('paCourseId').value;
+  const classCode = document.getElementById('paClassCode').value;
+  const title = document.getElementById('paTitle').value.trim();
+  const due = document.getElementById('paDue').value;
+  if (!title) { showToast('⚠️ Assignment title is required.'); return; }
+  if (!due) { showToast('⚠️ Due date is required.'); return; }
+
+  const dueTime = document.getElementById('paDueTime').value || '23:59';
+  const priority = document.getElementById('paPriority').value;
+  const duration = parseInt(document.getElementById('paDuration').value) || 60;
+  const notes = document.getElementById('paNotes').value.trim();
+
+  const course = (globalData.recurring || []).find(r => r.id === courseId || r.classCode === classCode);
+  if (!course) return;
+
+  if (!Array.isArray(course.assignments)) course.assignments = [];
+
+  const assignmentObj = {
+    id: uid(),
+    courseId: course.id,
+    courseTitle: course.title,
+    title,
+    due,
+    dueTime,
+    priority,
+    duration,
+    notes,
+    cat: 'assignment',
+    done: false,
+    createdAt: new Date().toISOString()
+  };
+
+  course.assignments.unshift(assignmentObj);
+  save();
+
+  // Push to Firestore collection classrooms/{classCode}
+  if (classCode && typeof firebase !== 'undefined' && firebase.apps.length) {
+    try {
+      await firebase.firestore().collection('classrooms').doc(classCode).update({
+        assignments: firebase.firestore.FieldValue.arrayUnion(assignmentObj),
+        updatedAt: new Date().toISOString()
+      });
+    } catch(e) {
+      console.warn('Assignment publish note:', e);
+    }
+  }
+
+  closeModal('publishAssignmentModal');
+  refreshAll();
+  showToast(`📢 Assignment "${title}" published to enrolled students!`, 4000);
+}
+
+// ── Post Course Announcement (Teacher) ──
+function openPostAnnouncementModal(courseId, classCode) {
+  const course = (globalData.recurring || []).find(r => r.id === courseId || r.classCode === classCode);
+  if (!course) return;
+
+  document.getElementById('panCourseId').value = course.id;
+  document.getElementById('panClassCode').value = course.classCode || classCode || '';
+  document.getElementById('panCourseTitleDisplay').textContent = `${course.title} (${course.classCode || ''})`;
+
+  document.getElementById('panTitle').value = '';
+  document.getElementById('panText').value = '';
+  document.getElementById('panUrgent').checked = false;
+
+  openModal('postAnnouncementModal');
+}
+
+async function submitPostAnnouncement() {
+  const courseId = document.getElementById('panCourseId').value;
+  const classCode = document.getElementById('panClassCode').value;
+  const title = document.getElementById('panTitle').value.trim();
+  const text = document.getElementById('panText').value.trim();
+  if (!title) { showToast('⚠️ Announcement title is required.'); return; }
+  if (!text) { showToast('⚠️ Announcement text is required.'); return; }
+
+  const urgent = document.getElementById('panUrgent').checked;
+  const course = (globalData.recurring || []).find(r => r.id === courseId || r.classCode === classCode);
+  if (!course) return;
+
+  if (!Array.isArray(course.announcements)) course.announcements = [];
+
+  const u = getCurrentUser() || CURRENT_USER || {};
+  const instructorName = u.displayName || u.name || 'Instructor';
+
+  const annObj = {
+    id: uid(),
+    courseId: course.id,
+    courseTitle: course.title,
+    title,
+    text,
+    urgent,
+    byUser: instructorName,
+    timestamp: Date.now()
+  };
+
+  course.announcements.unshift(annObj);
+  save();
+
+  // Push to Firestore collection classrooms/{classCode}
+  if (classCode && typeof firebase !== 'undefined' && firebase.apps.length) {
+    try {
+      await firebase.firestore().collection('classrooms').doc(classCode).update({
+        announcements: firebase.firestore.FieldValue.arrayUnion(annObj),
+        updatedAt: new Date().toISOString()
+      });
+    } catch(e) {
+      console.warn('Announcement publish note:', e);
+    }
+  }
+
+  closeModal('postAnnouncementModal');
+  refreshAll();
+  showToast(`📢 Announcement "${title}" broadcast to all students!`, 4000);
+}
+
+function quickBroadcastAnnouncement() {
+  const select = document.getElementById('quickAnnounceCourseSelect');
+  const classCodeOrId = select?.value;
+  if (!classCodeOrId) {
+    showToast('⚠️ Please select a course to broadcast.');
+    return;
+  }
+  const course = (globalData.recurring || []).find(r => r.id === classCodeOrId || r.classCode === classCodeOrId);
+  if (!course) {
+    showToast('⚠️ Selected course not found.');
+    return;
+  }
+  const title = (document.getElementById('quickAnnounceTitle')?.value || '').trim();
+  const text = (document.getElementById('quickAnnounceText')?.value || '').trim();
+
+  if (!title || !text) {
+    showToast('⚠️ Headline and details are required.');
+    return;
+  }
+
+  const u = getCurrentUser() || CURRENT_USER || {};
+  const annObj = {
+    id: uid(),
+    courseId: course.id,
+    courseTitle: course.title,
+    title,
+    text,
+    urgent: false,
+    byUser: u.displayName || u.name || 'Instructor',
+    timestamp: Date.now()
+  };
+
+  if (!Array.isArray(course.announcements)) course.announcements = [];
+  course.announcements.unshift(annObj);
+  save();
+
+  if (course.classCode && typeof firebase !== 'undefined' && firebase.apps.length) {
+    firebase.firestore().collection('classrooms').doc(course.classCode).update({
+      announcements: firebase.firestore.FieldValue.arrayUnion(annObj),
+      updatedAt: new Date().toISOString()
+    }).catch(e => console.warn('Broadcast note:', e));
+  }
+
+  document.getElementById('quickAnnounceTitle').value = '';
+  document.getElementById('quickAnnounceText').value = '';
+  refreshAll();
+  showToast(`📢 Broadcast sent to ${course.title}!`);
+}
+
+// ── Student Join Course Modal ──
+function openJoinClassModal(prefillCode = '') {
+  const codeInp = document.getElementById('jcCode');
+  const preview = document.getElementById('jcPreviewBox');
+  const feedback = document.getElementById('jcFeedback');
+
+  if (codeInp) {
+    codeInp.value = prefillCode ? prefillCode.toUpperCase().trim() : '';
+  }
+  if (preview) preview.classList.add('hidden');
+  if (feedback) feedback.classList.add('hidden');
+
+  if (prefillCode) {
+    onJoinCodeInput(prefillCode);
+  }
+
+  openModal('joinClassModal');
+}
+
+let joinCodeDebounce = null;
+async function onJoinCodeInput(val) {
+  const code = (val || '').toUpperCase().trim();
+  const preview = document.getElementById('jcPreviewBox');
+  const feedback = document.getElementById('jcFeedback');
+  if (!preview) return;
+
+  clearTimeout(joinCodeDebounce);
+  if (code.length < 4) {
+    preview.classList.add('hidden');
+    if (feedback) feedback.classList.add('hidden');
+    return;
+  }
+
+  joinCodeDebounce = setTimeout(async () => {
+    if (typeof firebase === 'undefined' || !firebase.apps.length) return;
+    try {
+      const doc = await firebase.firestore().collection('classrooms').doc(code).get();
+      if (doc.exists) {
+        const data = doc.data();
+        document.getElementById('jpCat').textContent = (CAT_ICONS[data.cat] || '🎓') + ' ' + (data.cat || 'Lecture');
+        document.getElementById('jpTitle').textContent = data.title;
+        document.getElementById('jpInstructor').textContent = data.instructorName || 'Professor';
+        document.getElementById('jpSchedule').textContent = `${data.start}–${data.end} (${data.freq || 'Weekly'})`;
+        document.getElementById('jpLocation').textContent = data.location || 'Classroom / Campus';
+        preview.classList.remove('hidden');
+        if (feedback) feedback.classList.add('hidden');
+      } else {
+        preview.classList.add('hidden');
+        if (feedback) {
+          feedback.className = 'invite-feedback';
+          feedback.innerHTML = '<i class="fas fa-info-circle"></i> No course found with code <b>' + esc(code) + '</b>. Check code spelling.';
+          feedback.classList.remove('hidden');
+        }
+      }
+    } catch(e) {
+      console.warn('Classroom query note:', e);
+    }
+  }, 400);
+}
+
+async function submitJoinCourse() {
+  const codeInp = document.getElementById('jcCode');
+  const code = (codeInp?.value || '').toUpperCase().trim();
+  const feedback = document.getElementById('jcFeedback');
+  const btn = document.getElementById('btnSubmitJoinCourse');
+
+  if (!code) {
+    showToast('⚠️ Please enter a Class Code.');
+    return;
+  }
+
+  // Check if student already enrolled
+  const existing = (globalData.recurring || []).find(r => r.classCode === code);
+  if (existing) {
+    showToast(`ℹ️ You are already enrolled in "${existing.title}".`);
+    closeModal('joinClassModal');
+    return;
+  }
+
+  if (btn) btn.disabled = true;
+  if (feedback) {
+    feedback.className = 'invite-feedback';
+    feedback.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying Class Code &amp; enrolling…';
+    feedback.classList.remove('hidden');
+  }
+
+  try {
+    const doc = await firebase.firestore().collection('classrooms').doc(code).get();
+    if (!doc.exists) {
+      if (btn) btn.disabled = false;
+      if (feedback) {
+        feedback.innerHTML = '❌ Class code not found. Please confirm with your instructor.';
+      }
+      return;
+    }
+
+    const data = doc.data();
+    const u = getCurrentUser() || CURRENT_USER || {};
+    const studentInfo = {
+      uid: u.uid || uid(),
+      name: u.displayName || u.name || u.username || 'Student',
+      username: u.username || '',
+      email: u.email || '',
+      enrolledAt: new Date().toISOString()
+    };
+
+    // Update Firestore enrolled students
+    try {
+      await firebase.firestore().collection('classrooms').doc(code).update({
+        studentUids: firebase.firestore.FieldValue.arrayUnion(studentInfo.uid),
+        enrolledStudents: firebase.firestore.FieldValue.arrayUnion(studentInfo),
+        updatedAt: new Date().toISOString()
+      });
+    } catch(e) {
+      console.warn('Firestore enroll note:', e);
+    }
+
+    // Add to student's recurring classes
+    const courseObj = {
+      id: data.courseId || uid(),
+      title: data.title,
+      cat: data.cat || 'lecture',
+      color: data.color || '#1565C0',
+      start: data.start,
+      end: data.end,
+      days: data.days || [1],
+      freq: data.freq || 'weekly',
+      startDate: data.startDate || todayStr(),
+      endDate: data.endDate || null,
+      location: data.location || '',
+      description: data.description || '',
+      classCode: code,
+      instructorUid: data.instructorUid || '',
+      instructorName: data.instructorName || 'Professor',
+      isEnrolled: true,
+      assignments: data.assignments || [],
+      announcements: data.announcements || [],
+      courseNotes: []
+    };
+
+    if (!Array.isArray(globalData.recurring)) globalData.recurring = [];
+    globalData.recurring.push(courseObj);
+
+    // Sync any published assignments into student's active assignments
+    (data.assignments || []).forEach(asgn => {
+      const taskObj = {
+        id: asgn.id || uid(),
+        courseId: courseObj.id,
+        title: asgn.title,
+        cat: 'assignment',
+        due: asgn.due,
+        priority: asgn.priority || 'normal',
+        duration: asgn.duration || 60,
+        notes: asgn.notes || `Course: ${data.title}`,
+        done: false
+      };
+      const curDay = dayData(asgn.due || currentDate);
+      if (!Array.isArray(curDay.tasks)) curDay.tasks = [];
+      if (!curDay.tasks.some(t => t.id === taskObj.id)) {
+        curDay.tasks.push(taskObj);
+      }
+    });
+
+    save();
+    playNotificationChime();
+    closeModal('joinClassModal');
+    refreshAll();
+    renderTasks();
+    showToast(`🎓 Successfully enrolled in "${data.title}" taught by ${data.instructorName || 'your instructor'}!`, 5000);
+  } catch(err) {
+    if (btn) btn.disabled = false;
+    if (feedback) {
+      feedback.innerHTML = `⚠️ Enrollment error: ${err.message || 'Please check your connection.'}`;
+    }
+  }
+}
+
+function checkUrlForClassCode() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const joinCode = params.get('join');
+    if (joinCode) {
+      setTimeout(() => {
+        openJoinClassModal(joinCode);
+      }, 500);
+    }
+  } catch(e) {}
+}
+
+// ── Student Roster Modal (Teacher) ──
+async function openClassRosterModal(classCodeOrCourseId) {
+  const course = (globalData.recurring || []).find(r => r.classCode === classCodeOrCourseId || r.id === classCodeOrCourseId);
+  const classCode = course?.classCode || classCodeOrCourseId;
+
+  document.getElementById('rosterModalTitle').innerHTML = `<i class="fas fa-user-graduate"></i> ${course ? esc(course.title) : 'Class'} Roster`;
+  document.getElementById('rosterModalSub').textContent = course ? `${course.start}–${course.end} • ${course.location || 'Classroom'}` : 'Student Roster';
+  document.getElementById('rosterClassCodeBadge').textContent = `CODE: ${classCode}`;
+
+  const listEl = document.getElementById('classRosterList');
+  const countEl = document.getElementById('rosterStudentCount');
+
+  let students = course?.enrolledStudents || [];
+  if (countEl) countEl.textContent = `${students.length} Student${students.length !== 1 ? 's' : ''} Enrolled`;
+
+  if (listEl) {
+    if (!students.length) {
+      listEl.innerHTML = `
+        <div class="empty-state" style="padding:28px 14px;">
+          <i class="fas fa-user-graduate"></i>
+          <h4>No Students Enrolled Yet</h4>
+          <p>Share your Class Code <b>${esc(classCode)}</b> with your students to have them appear here automatically.</p>
+          <button class="btn-primary btn-sm" onclick="copyClassCode('${classCode}')">
+            <i class="fas fa-copy"></i> Copy Class Code
+          </button>
+        </div>`;
+    } else {
+      listEl.innerHTML = students.map(s => {
+        const av = (s.name || s.username || 'S').charAt(0).toUpperCase();
+        const dateStr = s.enrolledAt ? new Date(s.enrolledAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'Recently';
+        return `
+          <div class="roster-student-item">
+            <div class="roster-av">${av}</div>
+            <div class="roster-info">
+              <div class="roster-name">${esc(s.name || s.username || 'Student')}</div>
+              <div class="roster-meta">
+                ${s.username ? `<span>@${esc(s.username)}</span>` : ''}
+                ${s.email ? `<span><i class="fas fa-envelope"></i> ${esc(s.email)}</span>` : ''}
+                <span style="margin-left:auto"><i class="fas fa-calendar-check"></i> Enrolled: ${dateStr}</span>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+  }
+
+  openModal('classRosterModal');
+
+  // Pull latest from Firestore in background
+  if (classCode && typeof firebase !== 'undefined' && firebase.apps.length) {
+    try {
+      const doc = await firebase.firestore().collection('classrooms').doc(classCode).get();
+      if (doc.exists) {
+        const fresh = doc.data().enrolledStudents || [];
+        if (course) course.enrolledStudents = fresh;
+        if (countEl) countEl.textContent = `${fresh.length} Student${fresh.length !== 1 ? 's' : ''} Enrolled`;
+        if (listEl && fresh.length) {
+          listEl.innerHTML = fresh.map(s => {
+            const av = (s.name || s.username || 'S').charAt(0).toUpperCase();
+            const dateStr = s.enrolledAt ? new Date(s.enrolledAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'Recently';
+            return `
+              <div class="roster-student-item">
+                <div class="roster-av">${av}</div>
+                <div class="roster-info">
+                  <div class="roster-name">${esc(s.name || s.username || 'Student')}</div>
+                  <div class="roster-meta">
+                    ${s.username ? `<span>@${esc(s.username)}</span>` : ''}
+                    ${s.email ? `<span><i class="fas fa-envelope"></i> ${esc(s.email)}</span>` : ''}
+                    <span style="margin-left:auto"><i class="fas fa-calendar-check"></i> Enrolled: ${dateStr}</span>
+                  </div>
+                </div>
+              </div>`;
+          }).join('');
+        }
+      }
+    } catch(e) {}
+  }
+}
+
+// ── Real-Time Classroom Sync (Live onSnapshot) ──
+function initClassroomsRealtimeSync() {
+  const user = getCurrentUser() || CURRENT_USER;
+  if (!user || !user.uid || typeof firebase === 'undefined' || !firebase.apps.length) return;
+
+  if (classroomsUnsubscribe) {
+    try { classroomsUnsubscribe(); } catch(e){}
+    classroomsUnsubscribe = null;
+  }
+
+  const isTeacher = isTeacherRole();
+  const dbFs = firebase.firestore();
+
+  try {
+    let query;
+    if (isTeacher) {
+      // Teachers listen to courses they teach to observe student enrollments
+      query = dbFs.collection('classrooms').where('instructorUid', '==', user.uid);
+    } else {
+      // Students listen to courses they are enrolled in to get live assignments & announcements
+      query = dbFs.collection('classrooms').where('studentUids', 'array-contains', user.uid);
+    }
+
+    classroomsUnsubscribe = query.onSnapshot(snapshot => {
+      snapshot.docChanges().forEach(change => {
+        const classData = change.doc.data();
+        if (change.type === 'removed') {
+          (globalData.recurring || []).forEach(c => {
+            if (c.classCode === classData.classCode) c.isEnrolled = false;
+          });
+        } else {
+          // Find or link recurring course
+          let course = (globalData.recurring || []).find(r => r.classCode === classData.classCode || r.id === classData.courseId);
+          if (course) {
+            const prevAssignmentsCount = (course.assignments || []).length;
+            const prevAnnounceCount = (course.announcements || []).length;
+
+            course.title = classData.title || course.title;
+            course.start = classData.start || course.start;
+            course.end = classData.end || course.end;
+            course.location = classData.location || course.location;
+            course.enrolledStudents = classData.enrolledStudents || course.enrolledStudents || [];
+            course.studentUids = classData.studentUids || course.studentUids || [];
+            course.assignments = classData.assignments || course.assignments || [];
+            course.announcements = classData.announcements || course.announcements || [];
+
+            // Alert student if new announcement or assignment arrived live
+            if (!isTeacher && change.type === 'modified') {
+              if ((course.assignments || []).length > prevAssignmentsCount) {
+                const latestAsgn = course.assignments[0];
+                playNotificationChime();
+                showToast(`📝 [${course.title}] New Assignment: ${latestAsgn.title}`, 4500);
+              }
+              if ((course.announcements || []).length > prevAnnounceCount) {
+                const latestAnn = course.announcements[0];
+                playNotificationChime();
+                showToast(`📢 [${course.title}] Announcement: ${latestAnn.title}`, 4500);
+              }
+            }
+          } else if (!isTeacher && classData.studentUids && classData.studentUids.includes(user.uid)) {
+            // Course was added for student
+            const newCourse = {
+              id: classData.courseId || uid(),
+              title: classData.title,
+              cat: classData.cat || 'lecture',
+              color: classData.color || '#1565C0',
+              start: classData.start,
+              end: classData.end,
+              days: classData.days || [1],
+              freq: classData.freq || 'weekly',
+              startDate: classData.startDate || todayStr(),
+              endDate: classData.endDate || null,
+              location: classData.location || '',
+              description: classData.description || '',
+              classCode: classData.classCode,
+              instructorUid: classData.instructorUid || '',
+              instructorName: classData.instructorName || 'Professor',
+              isEnrolled: true,
+              assignments: classData.assignments || [],
+              announcements: classData.announcements || [],
+              courseNotes: []
+            };
+            if (!Array.isArray(globalData.recurring)) globalData.recurring = [];
+            globalData.recurring.push(newCourse);
+          }
+        }
+      });
+
+      if (isTeacher) {
+        renderTeacherDashboard();
+      } else {
+        renderSchedule();
+        renderTasks();
+      }
+      updateNotificationCenter();
+      save();
+    }, err => {
+      console.warn('Real-time classroom listener note (offline mode active):', err);
+    });
+  } catch(e) {
+    console.warn('initClassroomsRealtimeSync error:', e);
+  }
+}
+
+// ══════════════════════════════════════════
 // PWA
 // ══════════════════════════════════════════
 function initPWA(){
@@ -2925,7 +3894,7 @@ function initPWA(){
 
     if('caches' in window) {
       caches.keys().then(keys => {
-        keys.forEach(k => { if(k !== 'ib-planner-v9') caches.delete(k); });
+        keys.forEach(k => { if(k !== 'ib-planner-v10') caches.delete(k); });
       });
     }
   }
@@ -3115,10 +4084,15 @@ async function savePersonalInfo() {
     }
   }
 
+  CURRENT_USER = session;
+  USER_KEY     = CURRENT_USER ? (CURRENT_USER.username || CURRENT_USER.email || 'user').toLowerCase().replace(/[^a-z0-9_]/g, '_') : 'guest';
   save();
   initUserBadge();
+  applyRoleUI();
+  initClassroomsRealtimeSync();
+  refreshAll();
   closeModal('personalInfoModal');
-  showToast('✅ Personal information updated!');
+  showToast(`✅ Profile saved! Switched to ${role === 'teacher' ? 'Teacher / Instructor' : 'Student'} mode.`, 3500);
 }
 
 async function sendPasswordResetFromProfile() {
@@ -3200,6 +4174,9 @@ document.addEventListener('DOMContentLoaded', () => {
   try { initUserBadge(); } catch (e) { console.error('initUserBadge error:', e); }
   try { initCloudSync(); } catch (e) { console.error('initCloudSync error:', e); }
   try { initProjectsRealtimeSync(); } catch (e) { console.error('initProjectsRealtimeSync error:', e); }
+  try { applyRoleUI(); } catch (e) { console.error('applyRoleUI error:', e); }
+  try { initClassroomsRealtimeSync(); } catch (e) { console.error('initClassroomsRealtimeSync error:', e); }
+  try { checkUrlForClassCode(); } catch (e) { console.error('checkUrlForClassCode error:', e); }
   try { updateNotificationCenter(); } catch (e) { console.error('updateNotificationCenter error:', e); }
 
   currentDate = todayStr();

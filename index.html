@@ -14,7 +14,7 @@
   <link rel="manifest" href="manifest.json"/>
   <link rel="apple-touch-icon" href="icon-192.svg"/>
 
-  <link rel="stylesheet" href="style.css?v=9"/>
+  <link rel="stylesheet" href="style.css?v=10"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
 </head>
 <body>
@@ -47,22 +47,30 @@
     <div class="logo-ib">IB</div>
     <div class="logo-text">
       <span class="brand-title">IB Planner</span>
-      <span class="brand-sub">Full Day Academic Manager</span>
+      <span class="brand-sub" id="brandSub">Full Day Academic Manager</span>
     </div>
   </div>
 
-  <nav class="top-nav">
-    <button class="nav-btn active" data-view="dashboard" onclick="switchView('dashboard')"><i class="fas fa-th-large"></i><span> My Day</span></button>
-    <button class="nav-btn" data-view="week" onclick="switchView('week')"><i class="fas fa-calendar-week"></i><span> Week</span></button>
-    <button class="nav-btn" data-view="month" onclick="switchView('month')"><i class="fas fa-calendar-alt"></i><span> Month</span></button>
-    <button class="nav-btn" data-view="timeline" onclick="switchView('timeline')"><i class="fas fa-stream"></i><span> Timeline</span></button>
-    <button class="nav-btn" data-view="tasks" onclick="switchView('tasks')"><i class="fas fa-tasks"></i><span> Assignments</span></button>
-    <button class="nav-btn" data-view="notes" onclick="switchView('notes')"><i class="fas fa-sticky-note"></i><span> Notes</span></button>
-    <button class="nav-btn" data-view="contacts" onclick="switchView('contacts')"><i class="fas fa-user-graduate"></i><span> People</span></button>
-    <button class="nav-btn" data-view="analytics" onclick="switchView('analytics')"><i class="fas fa-chart-bar"></i><span> Analytics</span></button>
+  <nav class="top-nav" id="topNav">
+    <button class="nav-btn active" data-view="dashboard" onclick="switchView('dashboard')"><i class="fas fa-th-large"></i><span class="nav-text"> My Day</span></button>
+    <button class="nav-btn" data-view="week" onclick="switchView('week')"><i class="fas fa-calendar-week"></i><span class="nav-text"> Week</span></button>
+    <button class="nav-btn" data-view="month" onclick="switchView('month')"><i class="fas fa-calendar-alt"></i><span class="nav-text"> Month</span></button>
+    <button class="nav-btn" data-view="timeline" onclick="switchView('timeline')"><i class="fas fa-stream"></i><span class="nav-text"> Timeline</span></button>
+    <button class="nav-btn" data-view="tasks" onclick="switchView('tasks')"><i class="fas fa-tasks"></i><span class="nav-text"> Assignments</span></button>
+    <button class="nav-btn" data-view="notes" onclick="switchView('notes')"><i class="fas fa-sticky-note"></i><span class="nav-text"> Notes</span></button>
+    <button class="nav-btn" data-view="contacts" onclick="switchView('contacts')"><i class="fas fa-user-graduate"></i><span class="nav-text"> People</span></button>
+    <button class="nav-btn" data-view="analytics" onclick="switchView('analytics')"><i class="fas fa-chart-bar"></i><span class="nav-text"> Analytics</span></button>
   </nav>
 
   <div class="header-right">
+    <!-- Role-Specific Action Button (Join Course for Student / Create Class for Teacher) -->
+    <button class="btn-role-action teacher-action hidden" id="btnCreateClassHeader" onclick="openCreateClassroomModal()" title="Create New Academic Course">
+      <i class="fas fa-plus-circle"></i> <span>Create Class</span>
+    </button>
+    <button class="btn-role-action student-action" id="btnJoinClassHeader" onclick="openJoinClassModal()" title="Join Course with Class Code">
+      <i class="fas fa-link"></i> <span>Join Course</span>
+    </button>
+
     <button class="btn-sync-cloud" id="cloudSyncBtn" onclick="pullFromCloud(false)" title="Click to sync now with other devices">
       <i class="fas fa-cloud" id="cloudSyncStatus"></i>
       <span class="sync-status-text" id="syncStatusText">Synced</span>
@@ -151,188 +159,267 @@
       <button class="btn-primary" onclick="goToday()"><i class="fas fa-calendar-day"></i> Today</button>
     </div>
 
-    <!-- Stats Row -->
-    <div class="stats-row">
-      <div class="stat-card" style="--accent:#1565C0">
-        <i class="fas fa-book-open"></i>
-        <div><span class="stat-num" id="stat-hours">0h</span><span class="stat-lbl">Study Hours</span></div>
+    <!-- ─────────── STUDENT DASHBOARD WIDGETS (Visible for Students) ─────────── -->
+    <div id="studentDashboardWidgets">
+      <!-- Stats Row -->
+      <div class="stats-row">
+        <div class="stat-card" style="--accent:#1565C0">
+          <i class="fas fa-book-open"></i>
+          <div><span class="stat-num" id="stat-hours">0h</span><span class="stat-lbl">Study Hours</span></div>
+        </div>
+        <div class="stat-card" style="--accent:#0288D1">
+          <i class="fas fa-check-double"></i>
+          <div><span class="stat-num" id="stat-done">0</span><span class="stat-lbl">Done</span></div>
+        </div>
+        <div class="stat-card" style="--accent:#0097A7">
+          <i class="fas fa-hourglass-half"></i>
+          <div><span class="stat-num" id="stat-pending">0</span><span class="stat-lbl">To Do</span></div>
+        </div>
+        <div class="stat-card" style="--accent:#C62828">
+          <i class="fas fa-exclamation-circle"></i>
+          <div><span class="stat-num" id="stat-priority">0</span><span class="stat-lbl">Urgent</span></div>
+        </div>
+        <div class="stat-card" style="--accent:#5D4037">
+          <i class="fas fa-coffee"></i>
+          <div><span class="stat-num" id="stat-breaks">0</span><span class="stat-lbl">Breaks</span></div>
+        </div>
+        <div class="stat-card" style="--accent:#283593">
+          <i class="fas fa-graduation-cap"></i>
+          <div><span class="stat-num" id="stat-progress">0%</span><span class="stat-lbl">Day Progress</span></div>
+        </div>
       </div>
-      <div class="stat-card" style="--accent:#0288D1">
-        <i class="fas fa-check-double"></i>
-        <div><span class="stat-num" id="stat-done">0</span><span class="stat-lbl">Done</span></div>
-      </div>
-      <div class="stat-card" style="--accent:#0097A7">
-        <i class="fas fa-hourglass-half"></i>
-        <div><span class="stat-num" id="stat-pending">0</span><span class="stat-lbl">To Do</span></div>
-      </div>
-      <div class="stat-card" style="--accent:#C62828">
-        <i class="fas fa-exclamation-circle"></i>
-        <div><span class="stat-num" id="stat-priority">0</span><span class="stat-lbl">Urgent</span></div>
-      </div>
-      <div class="stat-card" style="--accent:#5D4037">
-        <i class="fas fa-coffee"></i>
-        <div><span class="stat-num" id="stat-breaks">0</span><span class="stat-lbl">Breaks</span></div>
-      </div>
-      <div class="stat-card" style="--accent:#283593">
-        <i class="fas fa-graduation-cap"></i>
-        <div><span class="stat-num" id="stat-progress">0%</span><span class="stat-lbl">Day Progress</span></div>
-      </div>
-    </div>
 
-    <!-- Progress Bar -->
-    <div class="day-progress-bar">
-      <div class="dpb-label"><i class="fas fa-graduation-cap"></i> Academic Day Progress</div>
-      <div class="dpb-track"><div class="dpb-fill" id="dayProgressFill"></div></div>
-      <span id="dayProgressPct">0%</span>
-    </div>
+      <!-- Progress Bar -->
+      <div class="day-progress-bar">
+        <div class="dpb-label"><i class="fas fa-graduation-cap"></i> Academic Day Progress</div>
+        <div class="dpb-track"><div class="dpb-fill" id="dayProgressFill"></div></div>
+        <span id="dayProgressPct">0%</span>
+      </div>
 
-    <!-- Dashboard Grid -->
-    <div class="dashboard-grid">
+      <!-- Dashboard Grid -->
+      <div class="dashboard-grid">
 
-      <!-- Timetable Panel -->
-      <div class="panel panel-schedule">
+        <!-- Timetable Panel -->
+        <div class="panel panel-schedule">
+          <div class="panel-header">
+            <h2><i class="fas fa-calendar-alt"></i> Timetable</h2>
+            <div class="panel-actions">
+              <select id="filterCategory" onchange="renderSchedule()">
+                <option value="all">All Categories</option>
+                <option value="lecture">Lecture</option>
+                <option value="study">Study</option>
+                <option value="assignment">Assignment</option>
+                <option value="exam">Exam / Test</option>
+                <option value="group">Study Group</option>
+                <option value="library">Library</option>
+                <option value="break">Break</option>
+                <option value="meal">Meal</option>
+                <option value="sport">Sport</option>
+                <option value="social">Social</option>
+                <option value="personal">Personal</option>
+                <option value="travel">Travel</option>
+              </select>
+              <button class="btn-secondary" onclick="renderRecurringList(); openModal('recurringModal')"><i class="fas fa-redo"></i> Routine Classes</button>
+              <button class="btn-primary" onclick="openAddEventModal()"><i class="fas fa-plus"></i> Add Event</button>
+            </div>
+          </div>
+          <div class="schedule-list" id="scheduleList"></div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="right-col">
+
+          <!-- Quick Add -->
+          <div class="panel panel-quick">
+            <div class="panel-header"><h2><i class="fas fa-plus-circle"></i> Quick Add</h2></div>
+            <div class="quick-form">
+              <input type="text" id="quickTitle" placeholder="e.g. Math Lecture, Study session…"/>
+              <div class="quick-row">
+                <input type="time" id="quickStart" value="08:00"/>
+                <span>→</span>
+                <input type="time" id="quickEnd" value="10:00"/>
+              </div>
+              <select id="quickCat">
+                <option value="lecture">🎓 Lecture</option>
+                <option value="study">📖 Study</option>
+                <option value="assignment">📝 Assignment</option>
+                <option value="exam">📋 Exam / Test</option>
+                <option value="group">🤝 Study Group</option>
+                <option value="library">📚 Library</option>
+                <option value="break">☕ Break</option>
+                <option value="meal">🍽️ Meal</option>
+                <option value="sport">🏃 Sport</option>
+                <option value="social">🎉 Social</option>
+                <option value="personal">🧘 Personal</option>
+                <option value="travel">🚗 Travel</option>
+              </select>
+              <button class="btn-primary full-width" onclick="quickAdd()"><i class="fas fa-bolt"></i> Quick Add</button>
+            </div>
+          </div>
+
+          <!-- Mood & Energy -->
+          <div class="panel panel-mood">
+            <div class="panel-header"><h2><i class="fas fa-smile"></i> Mood &amp; Energy</h2></div>
+            <div class="mood-grid">
+              <div class="mood-section">
+                <label>Morning Mood</label>
+                <div class="emoji-row" id="moodMorningRow">
+                  <span class="emoji-opt" data-val="😔" onclick="setMood('moodMorning','😔',this)">😔</span>
+                  <span class="emoji-opt" data-val="😐" onclick="setMood('moodMorning','😐',this)">😐</span>
+                  <span class="emoji-opt" data-val="🙂" onclick="setMood('moodMorning','🙂',this)">🙂</span>
+                  <span class="emoji-opt" data-val="😊" onclick="setMood('moodMorning','😊',this)">😊</span>
+                  <span class="emoji-opt" data-val="🤩" onclick="setMood('moodMorning','🤩',this)">🤩</span>
+                </div>
+              </div>
+              <div class="mood-section">
+                <label>Evening Mood</label>
+                <div class="emoji-row" id="moodEveningRow">
+                  <span class="emoji-opt" data-val="😔" onclick="setMood('moodEvening','😔',this)">😔</span>
+                  <span class="emoji-opt" data-val="😐" onclick="setMood('moodEvening','😐',this)">😐</span>
+                  <span class="emoji-opt" data-val="🙂" onclick="setMood('moodEvening','🙂',this)">🙂</span>
+                  <span class="emoji-opt" data-val="😊" onclick="setMood('moodEvening','😊',this)">😊</span>
+                  <span class="emoji-opt" data-val="🤩" onclick="setMood('moodEvening','🤩',this)">🤩</span>
+                </div>
+              </div>
+              <div class="mood-section full">
+                <label>Focus &amp; Energy Level</label>
+                <input type="range" min="1" max="10" value="5" id="energySlider" oninput="saveEnergy(this.value)" class="energy-slider"/>
+                <div class="energy-labels"><span>Low</span><span id="energyVal">5</span><span>High</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Health Tracker -->
+          <div class="panel panel-health">
+            <div class="panel-header"><h2><i class="fas fa-heartbeat"></i> Daily Tracker</h2></div>
+            <div class="health-grid">
+              <div class="health-item">
+                <i class="fas fa-tint" style="color:#42A5F5"></i>
+                <label>Water (glasses)</label>
+                <div class="counter-row">
+                  <button onclick="adjustCounter('water',-1)">−</button>
+                  <span id="water-count">0</span>
+                  <button onclick="adjustCounter('water',1)">+</button>
+                </div>
+              </div>
+              <div class="health-item">
+                <i class="fas fa-apple-alt" style="color:#66BB6A"></i>
+                <label>Meals</label>
+                <div class="counter-row">
+                  <button onclick="adjustCounter('meals',-1)">−</button>
+                  <span id="meals-count">0</span>
+                  <button onclick="adjustCounter('meals',1)">+</button>
+                </div>
+              </div>
+              <div class="health-item">
+                <i class="fas fa-running" style="color:#FFA726"></i>
+                <label>Sport (min)</label>
+                <div class="counter-row">
+                  <button onclick="adjustCounter('exercise',-15)">−</button>
+                  <span id="exercise-count">0</span>
+                  <button onclick="adjustCounter('exercise',15)">+</button>
+                </div>
+              </div>
+              <div class="health-item">
+                <i class="fas fa-moon" style="color:#AB47BC"></i>
+                <label>Sleep (hrs)</label>
+                <div class="counter-row">
+                  <button onclick="adjustCounter('sleep',-0.5)">−</button>
+                  <span id="sleep-count">0</span>
+                  <button onclick="adjustCounter('sleep',0.5)">+</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /right-col -->
+      </div><!-- /dashboard-grid -->
+
+      <!-- Study Goals -->
+      <div class="panel panel-goals">
         <div class="panel-header">
-          <h2><i class="fas fa-calendar-alt"></i> Timetable</h2>
-          <div class="panel-actions">
-            <select id="filterCategory" onchange="renderSchedule()">
-              <option value="all">All Categories</option>
-              <option value="lecture">Lecture</option>
-              <option value="study">Study</option>
-              <option value="assignment">Assignment</option>
-              <option value="exam">Exam / Test</option>
-              <option value="group">Study Group</option>
-              <option value="library">Library</option>
-              <option value="break">Break</option>
-              <option value="meal">Meal</option>
-              <option value="sport">Sport</option>
-              <option value="social">Social</option>
-              <option value="personal">Personal</option>
-              <option value="travel">Travel</option>
-            </select>
-            <button class="btn-secondary" onclick="renderRecurringList(); openModal('recurringModal')"><i class="fas fa-redo"></i> Routine Classes</button>
-            <button class="btn-primary" onclick="openAddEventModal()"><i class="fas fa-plus"></i> Add Event</button>
-          </div>
+          <h2><i class="fas fa-bullseye"></i> Study Goals for Today</h2>
+          <button class="btn-primary" onclick="addGoal()"><i class="fas fa-plus"></i> Add Goal</button>
         </div>
-        <div class="schedule-list" id="scheduleList"></div>
+        <div class="goals-list" id="goalsList"></div>
+      </div>
+    </div><!-- /studentDashboardWidgets -->
+
+    <!-- ─────────── TEACHER ACADEMIC HUB (Visible for Teachers) ─────────── -->
+    <div id="teacherDashboardHub" class="teacher-dashboard-hub hidden">
+      <!-- Executive Academic Metrics -->
+      <div class="stats-row teacher-stats-row">
+        <div class="stat-card" style="--accent:#1565C0">
+          <i class="fas fa-university"></i>
+          <div><span class="stat-num" id="teacherStatCourses">0</span><span class="stat-lbl">Active Courses</span></div>
+        </div>
+        <div class="stat-card" style="--accent:#00838F">
+          <i class="fas fa-user-graduate"></i>
+          <div><span class="stat-num" id="teacherStatStudents">0</span><span class="stat-lbl">Enrolled Students</span></div>
+        </div>
+        <div class="stat-card" style="--accent:#6A1B9A">
+          <i class="fas fa-tasks"></i>
+          <div><span class="stat-num" id="teacherStatAssignments">0</span><span class="stat-lbl">Assignments</span></div>
+        </div>
+        <div class="stat-card" style="--accent:#E65100">
+          <i class="fas fa-bullhorn"></i>
+          <div><span class="stat-num" id="teacherStatAnnouncements">0</span><span class="stat-lbl">Announcements</span></div>
+        </div>
+        <div class="stat-card" style="--accent:#2E7D32">
+          <i class="fas fa-chalkboard-teacher"></i>
+          <div><span class="stat-num" id="teacherStatTodayClasses">0</span><span class="stat-lbl">Lectures Today</span></div>
+        </div>
       </div>
 
-      <!-- Right Column -->
-      <div class="right-col">
-
-        <!-- Quick Add -->
-        <div class="panel panel-quick">
-          <div class="panel-header"><h2><i class="fas fa-plus-circle"></i> Quick Add</h2></div>
-          <div class="quick-form">
-            <input type="text" id="quickTitle" placeholder="e.g. Math Lecture, Study session…"/>
-            <div class="quick-row">
-              <input type="time" id="quickStart" value="08:00"/>
-              <span>→</span>
-              <input type="time" id="quickEnd" value="10:00"/>
+      <!-- Teacher Main Workspace Grid -->
+      <div class="teacher-hub-grid">
+        <!-- Left: Course Hub & Classrooms -->
+        <div class="panel teacher-courses-panel">
+          <div class="panel-header">
+            <div>
+              <h2><i class="fas fa-chalkboard"></i> Academic Course Hub</h2>
+              <p class="panel-sub-desc">Manage taught courses, distribute student Class Codes, and publish course-wide materials.</p>
             </div>
-            <select id="quickCat">
-              <option value="lecture">🎓 Lecture</option>
-              <option value="study">📖 Study</option>
-              <option value="assignment">📝 Assignment</option>
-              <option value="exam">📋 Exam / Test</option>
-              <option value="group">🤝 Study Group</option>
-              <option value="library">📚 Library</option>
-              <option value="break">☕ Break</option>
-              <option value="meal">🍽️ Meal</option>
-              <option value="sport">🏃 Sport</option>
-              <option value="social">🎉 Social</option>
-              <option value="personal">🧘 Personal</option>
-              <option value="travel">🚗 Travel</option>
-            </select>
-            <button class="btn-primary full-width" onclick="quickAdd()"><i class="fas fa-bolt"></i> Quick Add</button>
+            <button class="btn-primary" onclick="openCreateClassroomModal()">
+              <i class="fas fa-plus"></i> Create Academic Course
+            </button>
+          </div>
+
+          <div class="teacher-courses-list" id="teacherCoursesGrid">
+            <!-- Dynamically populated course cards with Class Codes, copy buttons & actions -->
           </div>
         </div>
 
-        <!-- Mood & Energy -->
-        <div class="panel panel-mood">
-          <div class="panel-header"><h2><i class="fas fa-smile"></i> Mood &amp; Energy</h2></div>
-          <div class="mood-grid">
-            <div class="mood-section">
-              <label>Morning Mood</label>
-              <div class="emoji-row" id="moodMorningRow">
-                <span class="emoji-opt" data-val="😔" onclick="setMood('moodMorning','😔',this)">😔</span>
-                <span class="emoji-opt" data-val="😐" onclick="setMood('moodMorning','😐',this)">😐</span>
-                <span class="emoji-opt" data-val="🙂" onclick="setMood('moodMorning','🙂',this)">🙂</span>
-                <span class="emoji-opt" data-val="😊" onclick="setMood('moodMorning','😊',this)">😊</span>
-                <span class="emoji-opt" data-val="🤩" onclick="setMood('moodMorning','🤩',this)">🤩</span>
-              </div>
+        <!-- Right Column: Today's Teaching Sessions & Quick Broadcast -->
+        <div class="teacher-right-col">
+          <!-- Teaching Timetable for Today -->
+          <div class="panel panel-teacher-today">
+            <div class="panel-header">
+              <h3><i class="fas fa-clock"></i> Today's Teaching Schedule</h3>
             </div>
-            <div class="mood-section">
-              <label>Evening Mood</label>
-              <div class="emoji-row" id="moodEveningRow">
-                <span class="emoji-opt" data-val="😔" onclick="setMood('moodEvening','😔',this)">😔</span>
-                <span class="emoji-opt" data-val="😐" onclick="setMood('moodEvening','😐',this)">😐</span>
-                <span class="emoji-opt" data-val="🙂" onclick="setMood('moodEvening','🙂',this)">🙂</span>
-                <span class="emoji-opt" data-val="😊" onclick="setMood('moodEvening','😊',this)">😊</span>
-                <span class="emoji-opt" data-val="🤩" onclick="setMood('moodEvening','🤩',this)">🤩</span>
-              </div>
+            <div class="teacher-today-list" id="teacherTodayClassesList"></div>
+          </div>
+
+          <!-- Quick Announcement Publisher -->
+          <div class="panel panel-teacher-broadcast">
+            <div class="panel-header">
+              <h3><i class="fas fa-bullhorn"></i> Broadcast Announcement</h3>
             </div>
-            <div class="mood-section full">
-              <label>Focus &amp; Energy Level</label>
-              <input type="range" min="1" max="10" value="5" id="energySlider" oninput="saveEnergy(this.value)" class="energy-slider"/>
-              <div class="energy-labels"><span>Low</span><span id="energyVal">5</span><span>High</span></div>
+            <div class="quick-form">
+              <label style="font-size:11px;font-weight:600;color:var(--text)">Target Course</label>
+              <select id="quickAnnounceCourseSelect">
+                <option value="">Select course…</option>
+              </select>
+              <input type="text" id="quickAnnounceTitle" placeholder="Headline / Subject (e.g. Midterm prep)"/>
+              <textarea id="quickAnnounceText" rows="2" placeholder="Write message to all enrolled students…"></textarea>
+              <button class="btn-primary full-width" onclick="quickBroadcastAnnouncement()">
+                <i class="fas fa-paper-plane"></i> Broadcast to Students
+              </button>
             </div>
           </div>
         </div>
-
-        <!-- Health Tracker -->
-        <div class="panel panel-health">
-          <div class="panel-header"><h2><i class="fas fa-heartbeat"></i> Daily Tracker</h2></div>
-          <div class="health-grid">
-            <div class="health-item">
-              <i class="fas fa-tint" style="color:#42A5F5"></i>
-              <label>Water (glasses)</label>
-              <div class="counter-row">
-                <button onclick="adjustCounter('water',-1)">−</button>
-                <span id="water-count">0</span>
-                <button onclick="adjustCounter('water',1)">+</button>
-              </div>
-            </div>
-            <div class="health-item">
-              <i class="fas fa-apple-alt" style="color:#66BB6A"></i>
-              <label>Meals</label>
-              <div class="counter-row">
-                <button onclick="adjustCounter('meals',-1)">−</button>
-                <span id="meals-count">0</span>
-                <button onclick="adjustCounter('meals',1)">+</button>
-              </div>
-            </div>
-            <div class="health-item">
-              <i class="fas fa-running" style="color:#FFA726"></i>
-              <label>Sport (min)</label>
-              <div class="counter-row">
-                <button onclick="adjustCounter('exercise',-15)">−</button>
-                <span id="exercise-count">0</span>
-                <button onclick="adjustCounter('exercise',15)">+</button>
-              </div>
-            </div>
-            <div class="health-item">
-              <i class="fas fa-moon" style="color:#AB47BC"></i>
-              <label>Sleep (hrs)</label>
-              <div class="counter-row">
-                <button onclick="adjustCounter('sleep',-0.5)">−</button>
-                <span id="sleep-count">0</span>
-                <button onclick="adjustCounter('sleep',0.5)">+</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </div><!-- /right-col -->
-    </div><!-- /dashboard-grid -->
-
-    <!-- Study Goals -->
-    <div class="panel panel-goals">
-      <div class="panel-header">
-        <h2><i class="fas fa-bullseye"></i> Study Goals for Today</h2>
-        <button class="btn-primary" onclick="addGoal()"><i class="fas fa-plus"></i> Add Goal</button>
       </div>
-      <div class="goals-list" id="goalsList"></div>
-    </div>
+    </div><!-- /teacherDashboardHub -->
 
   </section>
 
@@ -1079,6 +1166,250 @@
   </div>
 </div>
 
+<!-- ══════════════ CREATE ACADEMIC COURSE MODAL (TEACHER) ══════════════ -->
+<div class="modal-overlay" id="createClassroomModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3 id="ccModalTitle"><i class="fas fa-university"></i> Create Academic Course</h3>
+      <button class="modal-close" onclick="closeModal('createClassroomModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editClassroomId"/>
+      <div class="form-group">
+        <label>Course Title *</label>
+        <input type="text" id="tcTitle" placeholder="e.g. Data Structures & Algorithms, Macroeconomics 101…"/>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Category</label>
+          <select id="tcCat">
+            <option value="lecture">🎓 Lecture</option>
+            <option value="study">📖 Seminar</option>
+            <option value="group">🔬 Laboratory</option>
+            <option value="exam">📋 Exam / Assessment</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Theme Color</label>
+          <div class="color-picker-row" id="tcColorPicker">
+            <span class="color-dot selected" data-color="#1565C0" style="background:#1565C0" onclick="selectTeacherCourseColor('#1565C0', this)"></span>
+            <span class="color-dot" data-color="#00838F" style="background:#00838F" onclick="selectTeacherCourseColor('#00838F', this)"></span>
+            <span class="color-dot" data-color="#2E7D32" style="background:#2E7D32" onclick="selectTeacherCourseColor('#2E7D32', this)"></span>
+            <span class="color-dot" data-color="#6A1B9A" style="background:#6A1B9A" onclick="selectTeacherCourseColor('#6A1B9A', this)"></span>
+            <span class="color-dot" data-color="#E65100" style="background:#E65100" onclick="selectTeacherCourseColor('#E65100', this)"></span>
+            <span class="color-dot" data-color="#C62828" style="background:#C62828" onclick="selectTeacherCourseColor('#C62828', this)"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Class Start Time *</label>
+          <input type="time" id="tcStart" value="09:00"/>
+        </div>
+        <div class="form-group">
+          <label>Class End Time *</label>
+          <input type="time" id="tcEnd" value="10:30"/>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Weekly Meeting Days *</label>
+        <div class="weekdays-selector">
+          <label class="wday-label"><input type="checkbox" class="tc-wday-cb" value="1" checked/> Mon</label>
+          <label class="wday-label"><input type="checkbox" class="tc-wday-cb" value="2"/> Tue</label>
+          <label class="wday-label"><input type="checkbox" class="tc-wday-cb" value="3" checked/> Wed</label>
+          <label class="wday-label"><input type="checkbox" class="tc-wday-cb" value="4"/> Thu</label>
+          <label class="wday-label"><input type="checkbox" class="tc-wday-cb" value="5"/> Fri</label>
+          <label class="wday-label"><input type="checkbox" class="tc-wday-cb" value="6"/> Sat</label>
+          <label class="wday-label"><input type="checkbox" class="tc-wday-cb" value="0"/> Sun</label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Room / Campus Location / Zoom Link</label>
+        <input type="text" id="tcLocation" placeholder="e.g. Science Hall 302 / Zoom Meeting link"/>
+      </div>
+
+      <div class="form-group">
+        <label>Class Code (Auto-generated or custom)</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" id="tcCustomCode" placeholder="Auto-generated if blank (e.g. CS101-7K9)" style="text-transform:uppercase;font-weight:700;letter-spacing:1px;"/>
+          <button type="button" class="btn-secondary" onclick="generateNewClassCodeInput()"><i class="fas fa-random"></i> Generate</button>
+        </div>
+        <small style="color:var(--text-light);font-size:11px;margin-top:4px;display:block">
+          Students will use this unique code to enroll in your class and synchronize their timetables and assignments.
+        </small>
+      </div>
+
+      <div class="form-group">
+        <label>Course Overview &amp; Syllabus Notes</label>
+        <textarea id="tcDesc" rows="2" placeholder="Course expectations, textbooks, office hours, grading policy…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('createClassroomModal')">Cancel</button>
+      <button class="btn-primary" onclick="saveTeacherClassroom()"><i class="fas fa-save"></i> Save &amp; Publish Course</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ JOIN COURSE MODAL (STUDENT) ══════════════ -->
+<div class="modal-overlay" id="joinClassModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3><i class="fas fa-link"></i> Join Course with Class Code</h3>
+      <button class="modal-close" onclick="closeModal('joinClassModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text);margin-bottom:12px">
+        Enter the <b>Class Code</b> provided by your professor or instructor (e.g. <code>CS101-7K9</code>).
+      </p>
+
+      <div class="form-group">
+        <label>Class Code *</label>
+        <input type="text" id="jcCode" class="join-code-input" placeholder="e.g. CS101-7K9" autocomplete="off" style="text-transform:uppercase;text-align:center;font-size:18px;font-weight:800;letter-spacing:2px;" oninput="onJoinCodeInput(this.value)"/>
+      </div>
+
+      <div id="jcPreviewBox" class="join-preview-box hidden">
+        <div class="jp-header">
+          <span class="jp-badge" id="jpCat">🎓 Lecture</span>
+          <span class="jp-title" id="jpTitle"></span>
+        </div>
+        <div class="jp-instructor"><i class="fas fa-chalkboard-teacher"></i> Taught by: <b id="jpInstructor"></b></div>
+        <div class="jp-schedule"><i class="fas fa-clock"></i> <span id="jpSchedule"></span></div>
+        <div class="jp-location"><i class="fas fa-map-marker-alt"></i> <span id="jpLocation"></span></div>
+      </div>
+
+      <div id="jcFeedback" class="invite-feedback hidden"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('joinClassModal')">Cancel</button>
+      <button class="btn-primary" id="btnSubmitJoinCourse" onclick="submitJoinCourse()"><i class="fas fa-check-circle"></i> Join Course</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ PUBLISH ASSIGNMENT MODAL (TEACHER) ══════════════ -->
+<div class="modal-overlay" id="publishAssignmentModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3><i class="fas fa-tasks"></i> Publish Course Assignment</h3>
+      <button class="modal-close" onclick="closeModal('publishAssignmentModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="paCourseId"/>
+      <input type="hidden" id="paClassCode"/>
+      <div class="target-course-pill" id="paCourseNameBadge">
+        <i class="fas fa-university"></i> <span id="paCourseTitleDisplay">Select Course</span>
+      </div>
+
+      <div class="form-group">
+        <label>Assignment Title *</label>
+        <input type="text" id="paTitle" placeholder="e.g. Homework 3: Binary Search Trees"/>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Due Date *</label>
+          <input type="date" id="paDue"/>
+        </div>
+        <div class="form-group">
+          <label>Due Time</label>
+          <input type="time" id="paDueTime" value="23:59"/>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Priority</label>
+          <select id="paPriority">
+            <option value="normal">🔵 Normal</option>
+            <option value="high">🔴 Urgent / High</option>
+            <option value="low">🟢 Low</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Estimated Workload (min)</label>
+          <input type="number" id="paDuration" placeholder="e.g. 60" min="5"/>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Instructions &amp; Deliverables</label>
+        <textarea id="paNotes" rows="3" placeholder="Submission guidelines, repository links, formatting requirements…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('publishAssignmentModal')">Cancel</button>
+      <button class="btn-primary" onclick="submitPublishAssignment()"><i class="fas fa-bullhorn"></i> Publish to All Students</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ POST ANNOUNCEMENT MODAL (TEACHER) ══════════════ -->
+<div class="modal-overlay" id="postAnnouncementModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3><i class="fas fa-bullhorn"></i> Broadcast Course Announcement</h3>
+      <button class="modal-close" onclick="closeModal('postAnnouncementModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="panCourseId"/>
+      <input type="hidden" id="panClassCode"/>
+      <div class="target-course-pill" id="panCourseNameBadge">
+        <i class="fas fa-university"></i> <span id="panCourseTitleDisplay">Select Course</span>
+      </div>
+
+      <div class="form-group">
+        <label>Announcement Headline *</label>
+        <input type="text" id="panTitle" placeholder="e.g. Midterm Exam Room Change, Guest Lecture…"/>
+      </div>
+
+      <div class="form-group">
+        <label>Announcement Details *</label>
+        <textarea id="panText" rows="3" placeholder="Type your announcement to all enrolled students…"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="panUrgent"/>
+          <span>Mark as Urgent / Priority alert</span>
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('postAnnouncementModal')">Cancel</button>
+      <button class="btn-primary" onclick="submitPostAnnouncement()"><i class="fas fa-paper-plane"></i> Broadcast Now</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ CLASS ROSTER MODAL (TEACHER) ══════════════ -->
+<div class="modal-overlay" id="classRosterModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div>
+        <h3 id="rosterModalTitle"><i class="fas fa-user-graduate"></i> Enrolled Students Roster</h3>
+        <p class="modal-subtitle" id="rosterModalSub">Course Roster &amp; Enrollment</p>
+      </div>
+      <button class="modal-close" onclick="closeModal('classRosterModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="roster-header-box">
+        <div class="rh-code-badge" id="rosterClassCodeBadge">CODE: —</div>
+        <div class="rh-count-badge" id="rosterStudentCount">0 Students Enrolled</div>
+      </div>
+      <div class="roster-list" id="classRosterList">
+        <!-- Student entries -->
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-primary" onclick="closeModal('classRosterModal')">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -1093,7 +1424,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js?v=9"></script>
-<script src="app.js?v=9"></script>
+<script src="firebase-config.js?v=10"></script>
+<script src="app.js?v=10"></script>
 </body>
 </html>

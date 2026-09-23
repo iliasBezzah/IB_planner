@@ -1935,4 +1935,392 @@ textarea{resize:vertical;}
   white-space: nowrap;
 }
 
+/* ══════════════════════════════════════════
+   ROLE-BASED INTERFACE & ACADEMIC HUB STYLES
+   ══════════════════════════════════════════ */
+
+/* Role Header Action Buttons */
+.btn-role-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+.btn-role-action.teacher-action {
+  background: linear-gradient(135deg, #1565C0, #0D47A1);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(21, 101, 192, 0.25);
+}
+.btn-role-action.teacher-action:hover {
+  background: linear-gradient(135deg, #1976D2, #1565C0);
+  transform: translateY(-1px);
+}
+.btn-role-action.student-action {
+  background: linear-gradient(135deg, #00838F, #006064);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 131, 143, 0.25);
+}
+.btn-role-action.student-action:hover {
+  background: linear-gradient(135deg, #0097A7, #00838F);
+  transform: translateY(-1px);
+}
+
+/* Teacher Dashboard Layout */
+.teacher-dashboard-hub {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.teacher-hub-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 992px) {
+  .teacher-hub-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.panel-sub-desc {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-top: 2px;
+}
+
+/* Teacher Course Cards Grid */
+.teacher-courses-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-top: 14px;
+}
+.teacher-course-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  transition: all 0.2s ease;
+  position: relative;
+  border-left: 5px solid var(--primary);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.teacher-course-card:hover {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-md);
+}
+
+.tcc-top-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.tcc-title-wrap {
+  flex: 1;
+}
+.tcc-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tcc-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-light);
+}
+.tcc-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Prominent Class Code Banner */
+.tcc-code-banner {
+  background: var(--surface2);
+  border: 1px dashed var(--primary);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.tcc-code-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tcc-code-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-light);
+  letter-spacing: 0.5px;
+}
+.tcc-code-tag {
+  font-family: monospace;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--primary);
+  background: var(--surface);
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  letter-spacing: 1px;
+}
+.tcc-code-btns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-code-copy {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+}
+.btn-code-copy:hover {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+/* Enrollment & Material Stats Pill */
+.tcc-stats-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+.tcc-stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: var(--surface2);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 11px;
+}
+.tcc-stat-pill.students {
+  background: rgba(0, 131, 143, 0.1);
+  color: #00838F;
+}
+.tcc-stat-pill.assignments {
+  background: rgba(106, 27, 154, 0.1);
+  color: #6A1B9A;
+}
+
+/* Teacher Card Action Buttons */
+.tcc-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.btn-tcc-action {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: all 0.2s;
+}
+.btn-tcc-action:hover {
+  background: var(--surface3, #e2e8f0);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* Today's Teaching Sessions */
+.teacher-today-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+.teacher-today-item {
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+  border-left: 4px solid var(--primary);
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.tti-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+.tti-meta {
+  font-size: 11px;
+  color: var(--text-light);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+/* Join Course Modal */
+.join-code-input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  transition: all 0.2s;
+}
+.join-code-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.15);
+}
+.join-preview-box {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+.jp-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.jp-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--primary);
+  color: #fff;
+}
+.jp-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Roster Modal */
+.roster-header-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+}
+.rh-code-badge {
+  font-family: monospace;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--primary);
+}
+.rh-count-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-light);
+}
+.roster-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 380px;
+  overflow-y: auto;
+}
+.roster-student-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.roster-av {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.roster-info {
+  flex: 1;
+  min-width: 0;
+}
+.roster-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+.roster-meta {
+  font-size: 11px;
+  color: var(--text-light);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Enrolled Class Pill in Timetable */
+.badge-enrolled-course {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(0, 131, 143, 0.15);
+  color: #00838F;
+  margin-left: 4px;
+}
+
 
