@@ -14,7 +14,7 @@
   <link rel="manifest" href="manifest.json"/>
   <link rel="apple-touch-icon" href="icon-192.svg"/>
 
-  <link rel="stylesheet" href="style.css?v=11"/>
+  <link rel="stylesheet" href="style.css?v=13"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
 </head>
 <body>
@@ -866,6 +866,21 @@
         <input type="text" id="piSchool" placeholder="e.g. University Name / IB School"/>
       </div>
 
+      <div class="form-group" style="background:var(--surface2);border:1px dashed var(--primary);border-radius:8px;padding:10px 12px;margin-top:12px;">
+        <label style="margin:0 0 4px;font-size:11px;font-weight:700;color:var(--primary);display:flex;align-items:center;gap:5px">
+          <i class="fas fa-fingerprint"></i> Verified Account Identifier (Firebase UID)
+        </label>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <code id="piUidDisplay" style="font-size:12px;font-weight:700;color:var(--text);word-break:break-all;">Loading…</code>
+          <button type="button" class="btn-secondary btn-sm" onclick="copyStudentUID()" title="Copy Firebase UID" style="flex-shrink:0;">
+            <i class="fas fa-copy"></i> Copy UID
+          </button>
+        </div>
+        <small style="font-size:10px;color:var(--text-light);margin-top:4px;display:block">
+          Your unique system ID. Instructors can use your Full Name or UID to manage course enrollments.
+        </small>
+      </div>
+
       <div style="margin-top:16px;padding:12px;background:#F0F7FF;border:1px solid #BBDEFB;border-radius:8px;display:flex;align-items:center;justify-content:space-between">
         <div>
           <div style="font-size:12px;font-weight:600;color:#0D1B2A">Security &amp; Password</div>
@@ -959,6 +974,9 @@
       <button class="course-tab-btn" data-tab="notes" onclick="switchCourseTab('notes')">
         <i class="fas fa-book-open"></i> <span>Course Notes (<span id="cdNoteCount">0</span>)</span>
       </button>
+      <button class="course-tab-btn" data-tab="discussion" onclick="switchCourseTab('discussion')">
+        <i class="fas fa-comments"></i> <span>Discussion &amp; Resources</span>
+      </button>
     </div>
 
     <div class="modal-body course-modal-body">
@@ -985,14 +1003,82 @@
       <div class="course-tab-panel" id="cdPanelNotes">
         <div class="cd-section-head">
           <div>
-            <h3><i class="fas fa-sticky-note"></i> Personal Course Notebook</h3>
-            <p style="font-size:12px;color:var(--text-light);margin-top:2px">Store lecture notes, exam tips, and study concepts specifically for this course.</p>
+            <h3><i class="fas fa-sticky-note"></i> Course Notebook &amp; Materials</h3>
+            <p style="font-size:12px;color:var(--text-light);margin-top:2px">Store lecture notes and study concepts. Instructors can toggle notes Public to share with all students.</p>
           </div>
           <button class="btn-primary btn-sm" onclick="addCourseNote()">
             <i class="fas fa-plus"></i> New Note
           </button>
         </div>
         <div id="cdNotesList" class="cd-notes-grid"></div>
+      </div>
+
+      <!-- TAB 4: In-App Course Group Chat / Discussion & Resources (Telegram Alternative) -->
+      <div class="course-tab-panel" id="cdPanelDiscussion">
+        <div class="chat-container">
+          <!-- Pinned Announcement Banner (if any) -->
+          <div class="chat-pinned-banner hidden" id="chatPinnedBanner">
+            <div class="cpb-icon"><i class="fas fa-thumbtack"></i></div>
+            <div class="cpb-content">
+              <span class="cpb-label">PINNED ANNOUNCEMENT</span>
+              <div class="cpb-text" id="chatPinnedText"></div>
+            </div>
+            <button type="button" class="cpb-close" id="btnChatUnpin" onclick="unpinCurrentCourseMessage()" title="Unpin Announcement">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+
+          <!-- Messages Stream Scroll Area -->
+          <div class="chat-messages-scroll" id="chatMessagesScroll">
+            <!-- Messages rendered dynamically -->
+          </div>
+
+          <!-- Code Snippet Drawer (Collapsible) -->
+          <div class="code-snippet-drawer hidden" id="chatCodeDrawer">
+            <div class="csd-header">
+              <span class="csd-title"><i class="fas fa-code"></i> Share Code Snippet</span>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <select id="chatCodeLang" class="csd-select">
+                  <option value="python">Python</option>
+                  <option value="javascript">JavaScript</option>
+                  <option value="java">Java</option>
+                  <option value="cpp">C / C++</option>
+                  <option value="html">HTML / CSS</option>
+                  <option value="sql">SQL</option>
+                  <option value="text">Plain Text</option>
+                </select>
+                <button type="button" class="csd-close" onclick="toggleCodeDrawer()"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+            <textarea id="chatCodeInput" rows="4" placeholder="// Paste code snippet, algorithm, or programming exercise here..."></textarea>
+          </div>
+
+          <!-- Resource Link Drawer (Collapsible) -->
+          <div class="code-snippet-drawer hidden" id="chatLinkDrawer">
+            <div class="csd-header">
+              <span class="csd-title"><i class="fas fa-link"></i> Share Resource Link (Google Drive, GitHub, Notion, etc.)</span>
+              <button type="button" class="csd-close" onclick="toggleLinkDrawer()"><i class="fas fa-times"></i></button>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <input type="url" id="chatLinkUrl" placeholder="Paste URL (e.g. Google Drive, GitHub, Notion, YouTube, etc.)" style="width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:6px; font-size:12px; background:var(--surface); color:var(--text); box-sizing:border-box; outline:none;">
+              <input type="text" id="chatLinkTitle" placeholder="Optional resource title (e.g. Chapter 4 Slide Deck, Lab Starter Repo)" style="width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:6px; font-size:12px; background:var(--surface); color:var(--text); box-sizing:border-box; outline:none;">
+            </div>
+          </div>
+
+          <!-- Chat Input Bar -->
+          <div class="chat-input-bar">
+            <button type="button" class="btn-chat-tool" onclick="toggleLinkDrawer()" title="Share Resource Link (Google Drive, GitHub, Notion...)">
+              <i class="fas fa-link"></i>
+            </button>
+            <button type="button" class="btn-chat-tool" onclick="toggleCodeDrawer()" title="Insert Code Snippet">
+              <i class="fas fa-code"></i>
+            </button>
+            <textarea id="chatInputText" rows="1" placeholder="Type a message, question, or paste links…" onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendCourseChatMessage();}"></textarea>
+            <button type="button" class="btn-primary btn-chat-send" onclick="sendCourseChatMessage()" title="Send Message">
+              <i class="fas fa-paper-plane"></i>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1253,9 +1339,14 @@
         <textarea id="tcDesc" rows="2" placeholder="Course expectations, textbooks, office hours, grading policy…"></textarea>
       </div>
     </div>
-    <div class="modal-footer">
-      <button class="btn-secondary" onclick="closeModal('createClassroomModal')">Cancel</button>
-      <button class="btn-primary" onclick="saveTeacherClassroom()"><i class="fas fa-save"></i> Save &amp; Publish Course</button>
+    <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+      <button type="button" class="btn-danger-outline hidden" id="btnDeleteClassModal" onclick="confirmArchiveOrDeleteClassroom(window._editingTeacherCourseId, window._editingTeacherClassCode)">
+        <i class="fas fa-trash-alt"></i> Delete Class
+      </button>
+      <div style="display:flex; gap:8px; margin-left:auto;">
+        <button class="btn-secondary" onclick="closeModal('createClassroomModal')">Cancel</button>
+        <button class="btn-primary" onclick="saveTeacherClassroom()"><i class="fas fa-save"></i> Save &amp; Publish Course</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1317,13 +1408,32 @@
 
       <div class="form-row">
         <div class="form-group">
-          <label>Due Date *</label>
+          <label><i class="fas fa-calendar-alt"></i> Submission Due Date *</label>
           <input type="date" id="paDue"/>
         </div>
         <div class="form-group">
-          <label>Due Time</label>
+          <label><i class="fas fa-clock"></i> Due Time</label>
           <input type="time" id="paDueTime" value="23:59"/>
         </div>
+      </div>
+
+      <div class="form-row" style="background:var(--surface2); padding:10px 12px; border-radius:8px; border:1px solid var(--border-color); margin-bottom:12px;">
+        <div class="form-group" style="margin-bottom:0">
+          <label><i class="fas fa-calendar-plus"></i> Scheduled Release Date</label>
+          <input type="date" id="paReleaseDate"/>
+          <small style="color:var(--text-light);font-size:11px;display:block;margin-top:2px;">Leave blank or set to today to publish immediately</small>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label><i class="fas fa-clock"></i> Release Time</label>
+          <input type="time" id="paReleaseTime" value="00:00"/>
+          <small style="color:var(--text-light);font-size:11px;display:block;margin-top:2px;">Hidden from students until this moment</small>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:10px;">
+        <span style="font-size:12px; color:var(--text-light); display:flex; align-items:center; gap:6px;">
+          <i class="fas fa-info-circle"></i> Creation Date: <strong id="paCreationDateDisplay" style="color:var(--text-main);">Today</strong>
+        </span>
       </div>
 
       <div class="form-row">
@@ -1406,6 +1516,10 @@
         <div class="rh-code-badge" id="rosterClassCodeBadge">CODE: —</div>
         <div class="rh-count-badge" id="rosterStudentCount">0 Students Enrolled</div>
       </div>
+      <div class="roster-search-bar" style="margin-bottom:12px; position:relative;">
+        <i class="fas fa-search" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-light); pointer-events:none;"></i>
+        <input type="text" id="rosterSearchInput" oninput="filterRosterStudents(this.value)" placeholder="Search enrolled students by full name or email..." style="width:100%; padding:9px 12px 9px 36px; border:1px solid var(--border-color); border-radius:8px; font-size:13px; background:var(--surface2); color:var(--text); outline:none; box-sizing:border-box;">
+      </div>
       <div class="roster-list" id="classRosterList">
         <!-- Student entries -->
       </div>
@@ -1426,11 +1540,11 @@
   <small>Click to dismiss</small>
 </div>
 
-<!-- Firebase App, Auth & Firestore SDKs -->
+<!-- Firebase App, Auth & Firestore SDKs (100% Spark Free Plan Compatible) -->
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js?v=11"></script>
-<script src="app.js?v=11"></script>
+<script src="firebase-config.js?v=13"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>

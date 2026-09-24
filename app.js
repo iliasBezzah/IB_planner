@@ -1649,6 +1649,23 @@ function openCourseDetails(courseId) {
   renderCourseAssignments(course);
   renderCourseNotes(course);
 
+  // If course has a Class Code, set up chat listener
+  const classCode = course.classCode;
+  if (classCode) {
+    initCourseChatListener(classCode);
+  } else {
+    cleanupCourseChatListener();
+    const chatScroll = document.getElementById('chatMessagesScroll');
+    if (chatScroll) {
+      chatScroll.innerHTML = `
+        <div class="empty-state" style="padding:28px 14px;">
+          <i class="fas fa-comments"></i>
+          <h4>Local Course</h4>
+          <p>This course does not have an active Class Code channel. Link it with a Class Code to enable real-time discussion and resource sharing.</p>
+        </div>`;
+    }
+  }
+
   const activeTabBtn = document.querySelector('.course-tab-btn.active');
   const currentTab = activeTabBtn ? activeTabBtn.dataset.tab : 'project';
   switchCourseTab(currentTab || 'project');
@@ -1663,11 +1680,18 @@ function switchCourseTab(tabName) {
   const panels = {
     project: document.getElementById('cdPanelProject'),
     assignments: document.getElementById('cdPanelAssignments'),
-    notes: document.getElementById('cdPanelNotes')
+    notes: document.getElementById('cdPanelNotes'),
+    discussion: document.getElementById('cdPanelDiscussion')
   };
   Object.keys(panels).forEach(key => {
     if (panels[key]) panels[key].classList.toggle('active', key === tabName);
   });
+  if (tabName === 'discussion') {
+    const course = getCourseById(currentActiveCourseId);
+    if (course && course.classCode) {
+      initCourseChatListener(course.classCode);
+    }
+  }
 }
 
 function editCurrentCourseSchedule() {
@@ -2667,7 +2691,10 @@ function renderCourseAssignments(course) {
   const countEl = document.getElementById('cdAssignmentCount');
   if (!course) return;
 
-  const assignments = course.assignments || [];
+  const isTeacher = isTeacherRole();
+  const allAssignments = course.assignments || [];
+  const assignments = allAssignments.filter(a => isTeacher || !a.releaseDate || a.releaseDate <= todayStr());
+
   if (countEl) countEl.textContent = assignments.length;
   if (!list) return;
 
@@ -2685,12 +2712,14 @@ function renderCourseAssignments(course) {
 
   const sorted = [...assignments].sort((a, b) => {
     if (a.done !== b.done) return a.done ? 1 : -1;
-    return (a.dueDate || '').localeCompare(b.dueDate || '');
+    return (a.dueDate || a.due || '').localeCompare(b.dueDate || b.due || '');
   });
 
   list.innerHTML = sorted.map(a => {
-    const isOverdue = !a.done && a.dueDate && (a.dueDate < todayStr());
-    const isToday = !a.done && a.dueDate === todayStr();
+    const dueDateVal = a.dueDate || a.due || '';
+    const isOverdue = !a.done && dueDateVal && (dueDateVal < todayStr());
+    const isToday = !a.done && dueDateVal === todayStr();
+    const isScheduled = a.releaseDate && a.releaseDate > todayStr();
     const intervals = a.reminderIntervals || [];
 
     return `
@@ -2699,10 +2728,16 @@ function renderCourseAssignments(course) {
           <i class="fas fa-check"></i>
         </div>
         <div class="cd-ass-content">
-          <div class="cd-ass-title">${esc(a.title)}</div>
+          <div class="cd-ass-title">
+            ${esc(a.title)}
+            ${isTeacher ? `
+              <span class="${isScheduled ? 'badge-scheduled-asgn' : 'badge-active-asgn'}" style="margin-left:6px">
+                <i class="fas ${isScheduled ? 'fa-hourglass-start' : 'fa-check-circle'}"></i> ${isScheduled ? `Scheduled: ${a.releaseDate} ${a.releaseTime || ''}` : 'Active'}
+              </span>` : ''}
+          </div>
           <div class="cd-ass-meta">
             <span class="cd-due-badge ${isOverdue || isToday ? 'urgent' : ''}">
-              <i class="fas fa-clock"></i> Due: ${formatDateShort(a.dueDate)} ${a.dueTime ? 'at ' + a.dueTime : ''}
+              <i class="fas fa-clock"></i> Due: ${formatDateShort(dueDateVal)} ${a.dueTime ? 'at ' + a.dueTime : ''}
               ${isOverdue ? ' (Overdue)' : (isToday ? ' (Today!)' : '')}
             </span>
             ${a.priority === 'high' ? '<span class="ev-priority">🔴 Urgent</span>' : ''}
@@ -2865,39 +2900,114 @@ function deleteCourseAssignment(assignmentId) {
   showToast('🗑️ Assignment deleted.');
 }
 
-// ── Course Personal Notes ──
+// ── Course Notes & Visibility Toggle (Public vs Private) ──
 function renderCourseNotes(course) {
   const grid = document.getElementById('cdNotesList');
   const countEl = document.getElementById('cdNoteCount');
   if (!course) return;
 
   if (!Array.isArray(course.courseNotes)) course.courseNotes = [];
-  if (countEl) countEl.textContent = course.courseNotes.length;
+  const isTeacher = isTeacherRole();
+  const publicNotes = Array.isArray(course.publicNotes) ? course.publicNotes : [];
+
+  if (countEl) countEl.textContent = course.courseNotes.length + (!isTeacher ? publicNotes.length : 0);
   if (!grid) return;
 
-  if (!course.courseNotes.length) {
-    grid.innerHTML = `
+  let html = '';
+
+  // For students: render instructor-shared public notes first
+  if (!isTeacher && publicNotes.length > 0) {
+    html += `
+      <div style="grid-column: 1 / -1; margin-bottom: 8px;">
+        <h4 style="font-size: 13px; font-weight: 700; color: var(--primary); display: flex; align-items: center; gap: 6px; margin: 0 0 10px;">
+          <i class="fas fa-chalkboard-teacher"></i> Instructor Shared Materials &amp; Public Notes
+        </h4>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-bottom: 16px;">
+          ${publicNotes.map(pn => `
+            <div class="cd-note-card" style="border-left: 3px solid var(--primary); background: var(--surface2);">
+              <div class="cd-note-header">
+                <span class="note-visibility-badge badge-public-note"><i class="fas fa-globe"></i> Instructor Shared</span>
+                <span style="font-size: 11px; color: var(--text-light);">${esc(pn.createdAt || '')}</span>
+              </div>
+              <div style="padding: 10px 12px; font-size: 13px; line-height: 1.45; color: var(--text); white-space: pre-wrap; font-family: inherit;">${esc(pn.text || '')}</div>
+            </div>
+          `).join('')}
+        </div>
+        <h4 style="font-size: 13px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 6px; margin: 8px 0 10px;">
+          <i class="fas fa-user-edit"></i> My Personal Notes
+        </h4>
+      </div>`;
+  }
+
+  if (!course.courseNotes.length && (!publicNotes.length || isTeacher)) {
+    html += `
       <div class="empty-state" style="grid-column:1/-1;padding:28px 16px;">
         <i class="fas fa-book-open"></i>
-        <p>No notes written yet for <b>${esc(course.title)}</b>.<br>Keep lecture notes, formulas, and study reminders right here.</p>
+        <p>No notes written yet for <b>${esc(course.title)}</b>.<br>${isTeacher ? 'Keep lecture notes, formulas, or share public study guides with students.' : 'Keep lecture notes, formulas, and study reminders right here.'}</p>
         <button class="btn-primary btn-sm" onclick="addCourseNote()">
           <i class="fas fa-plus"></i> Create First Note
         </button>
       </div>`;
+    grid.innerHTML = html;
     return;
   }
 
-  grid.innerHTML = course.courseNotes.map(n => `
+  html += course.courseNotes.map(n => `
     <div class="cd-note-card">
       <div class="cd-note-header">
-        <span><i class="fas fa-sticky-note" style="color:var(--primary);margin-right:4px"></i>${esc(n.createdAt || '')}</span>
-        <button class="cd-note-del-btn" title="Delete Note" onclick="deleteCourseNote('${n.id}')">
-          <i class="fas fa-trash"></i>
-        </button>
+        <div style="display:flex;align-items:center;gap:6px;">
+          ${isTeacher ? `
+            <span class="note-visibility-badge ${n.isPublic ? 'badge-public-note' : 'badge-private-note'}">
+              <i class="fas ${n.isPublic ? 'fa-globe' : 'fa-lock'}"></i> ${n.isPublic ? 'Public' : 'Private'}
+            </span>` : `
+            <span><i class="fas fa-sticky-note" style="color:var(--primary);margin-right:4px"></i></span>
+          `}
+          <span style="font-size:11px;color:var(--text-light);">${esc(n.createdAt || '')}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;">
+          ${isTeacher ? `
+            <button class="btn-note-toggle-public ${n.isPublic ? 'is-public' : ''}" onclick="toggleCourseNoteVisibility('${n.id}')" title="${n.isPublic ? 'Make note private (only me)' : 'Make note public (all enrolled students)'}">
+              <i class="fas ${n.isPublic ? 'fa-lock' : 'fa-globe'}"></i> ${n.isPublic ? 'Make Private' : 'Share Public'}
+            </button>` : ''}
+          <button class="cd-note-del-btn" title="Delete Note" onclick="deleteCourseNote('${n.id}')">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
       </div>
       <textarea class="cd-note-textarea" placeholder="Type lecture notes, concepts, exam tips..." oninput="updateCourseNote('${n.id}', this.value)">${esc(n.text || '')}</textarea>
     </div>
   `).join('');
+
+  grid.innerHTML = html;
+}
+
+async function toggleCourseNoteVisibility(noteId) {
+  const course = getCourseById(currentActiveCourseId);
+  if (!course || !course.courseNotes) return;
+  const n = course.courseNotes.find(x => x.id === noteId);
+  if (!n) return;
+
+  n.isPublic = !n.isPublic;
+  save();
+  renderCourseNotes(course);
+
+  // Sync public notes to Firestore classrooms/{classCode}
+  if (course.classCode && typeof firebase !== 'undefined' && firebase.apps.length) {
+    try {
+      const publicNotes = (course.courseNotes || [])
+        .filter(x => x.isPublic)
+        .map(x => ({ id: x.id, text: x.text, createdAt: x.createdAt, author: getCurrentUser()?.displayName || 'Instructor' }));
+
+      await firebase.firestore().collection('classrooms').doc(course.classCode).set({
+        publicNotes: publicNotes,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    } catch(err) {
+      console.warn('Sync public notes error:', err);
+    }
+  }
+
+  showToast(n.isPublic ? '🌐 Note shared with enrolled students!' : '🔒 Note is now private.');
 }
 
 function addCourseNote() {
@@ -2911,7 +3021,8 @@ function addCourseNote() {
   const newNote = {
     id: uid(),
     text: '',
-    createdAt: dateStr
+    createdAt: dateStr,
+    isPublic: false
   };
   course.courseNotes.unshift(newNote);
   save();
@@ -2923,6 +3034,7 @@ function addCourseNote() {
   }, 100);
 }
 
+let noteDebounceTimer = null;
 function updateCourseNote(noteId, text) {
   const course = getCourseById(currentActiveCourseId);
   if (!course || !course.courseNotes) return;
@@ -2930,16 +3042,49 @@ function updateCourseNote(noteId, text) {
   if (n) {
     n.text = text;
     save();
+
+    if (n.isPublic && course.classCode && typeof firebase !== 'undefined' && firebase.apps.length) {
+      clearTimeout(noteDebounceTimer);
+      noteDebounceTimer = setTimeout(async () => {
+        try {
+          const publicNotes = (course.courseNotes || [])
+            .filter(x => x.isPublic)
+            .map(x => ({ id: x.id, text: x.text, createdAt: x.createdAt, author: getCurrentUser()?.displayName || 'Instructor' }));
+
+          await firebase.firestore().collection('classrooms').doc(course.classCode).set({
+            publicNotes: publicNotes,
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+        } catch(e) {}
+      }, 800);
+    }
   }
 }
 
-function deleteCourseNote(noteId) {
+async function deleteCourseNote(noteId) {
   const course = getCourseById(currentActiveCourseId);
   if (!course || !course.courseNotes) return;
   if (!confirm('Delete this note?')) return;
+  const note = course.courseNotes.find(x => x.id === noteId);
+  const wasPublic = note?.isPublic;
+
   course.courseNotes = course.courseNotes.filter(x => x.id !== noteId);
   save();
   renderCourseNotes(course);
+
+  if (wasPublic && course.classCode && typeof firebase !== 'undefined' && firebase.apps.length) {
+    try {
+      const publicNotes = (course.courseNotes || [])
+        .filter(x => x.isPublic)
+        .map(x => ({ id: x.id, text: x.text, createdAt: x.createdAt, author: getCurrentUser()?.displayName || 'Instructor' }));
+
+      await firebase.firestore().collection('classrooms').doc(course.classCode).set({
+        publicNotes: publicNotes,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    } catch(e) {}
+  }
+
   showToast('🗑️ Note deleted.');
 }
 
@@ -3061,6 +3206,14 @@ function openCreateClassroomModal(editCourseId = null) {
   const isEdit = !!editCourseId;
   const course = isEdit ? (globalData.recurring || []).find(r => r.id === editCourseId) : null;
 
+  window._editingTeacherCourseId = editCourseId || null;
+  window._editingTeacherClassCode = course ? (course.classCode || '') : null;
+
+  const deleteBtn = document.getElementById('btnDeleteClassModal');
+  if (deleteBtn) {
+    deleteBtn.classList.toggle('hidden', !isEdit);
+  }
+
   document.getElementById('ccModalTitle').innerHTML = isEdit
     ? '<i class="fas fa-edit"></i> Edit Academic Course'
     : '<i class="fas fa-university"></i> Create Academic Course';
@@ -3134,6 +3287,7 @@ async function saveTeacherClassroom() {
     assignments: existingCourse?.assignments || [],
     announcements: existingCourse?.announcements || [],
     courseNotes: existingCourse?.courseNotes || [],
+    publicNotes: existingCourse?.publicNotes || [],
     updatedAt: new Date().toISOString()
   };
 
@@ -3151,6 +3305,49 @@ async function saveTeacherClassroom() {
   closeModal('createClassroomModal');
   refreshAll();
   showToast(`🎓 Academic Course "${title}" saved! Class Code: ${classCode}`, 4500);
+}
+
+// ── Course Management: Delete / Archive Class ──
+async function confirmArchiveOrDeleteClassroom(courseId, classCode) {
+  if (!courseId && !classCode) return;
+  const course = (globalData.recurring || []).find(r => r.id === courseId || (classCode && r.classCode === classCode));
+  const title = course?.title || 'Academic Course';
+  const cCode = classCode || course?.classCode;
+
+  const msg = `Are you sure you want to delete and archive the course "${title}" (${cCode || 'no code'})?\n\nThis will remove it from your active teaching list and clean up references for enrolled students.`;
+  if (!confirm(msg)) return;
+
+  // 1. Remove from local recurring
+  if (Array.isArray(globalData.recurring)) {
+    globalData.recurring = globalData.recurring.filter(r => r.id !== courseId && (!cCode || r.classCode !== cCode));
+  }
+
+  // 2. Remove associated day events or assignments
+  Object.keys(globalData.days || {}).forEach(d => {
+    if (globalData.days[d]?.events) {
+      globalData.days[d].events = globalData.days[d].events.filter(e => e.courseId !== courseId && (!cCode || e.classCode !== cCode));
+    }
+    if (globalData.days[d]?.tasks) {
+      globalData.days[d].tasks = globalData.days[d].tasks.filter(t => t.courseId !== courseId && (!cCode || t.classCode !== cCode));
+    }
+  });
+
+  save();
+
+  // 3. Clean up in Firestore
+  if (cCode && typeof firebase !== 'undefined' && firebase.apps.length) {
+    try {
+      await firebase.firestore().collection('classrooms').doc(cCode).delete();
+    } catch (err) {
+      console.warn('Classroom delete error in cloud (cached locally):', err);
+    }
+  }
+
+  closeModal('createClassroomModal');
+  closeModal('courseDetailsModal');
+  refreshAll();
+  renderTeacherDashboard();
+  showToast(`🗑️ Course "${title}" has been deleted and archived.`, 4000);
 }
 
 function copyClassCode(code) {
@@ -3293,9 +3490,14 @@ function renderTeacherDashboard() {
               ${c.location ? `<span class="tcc-meta-item"><i class="fas fa-map-marker-alt"></i> ${esc(c.location)}</span>` : ''}
             </div>
           </div>
-          <button class="btn-secondary btn-sm" onclick="openCreateClassroomModal('${c.id}')" title="Edit course settings">
-            <i class="fas fa-cog"></i> Settings
-          </button>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <button class="btn-secondary btn-sm" onclick="openCreateClassroomModal('${c.id}')" title="Edit course settings">
+              <i class="fas fa-cog"></i> Settings
+            </button>
+            <button class="btn-danger-outline btn-sm" onclick="confirmArchiveOrDeleteClassroom('${c.id}', '${c.classCode || ''}')" title="Delete or Archive Class">
+              <i class="fas fa-trash-alt"></i>
+            </button>
+          </div>
         </div>
 
         <!-- Prominent Class Code Banner with 1-Click Copy -->
@@ -3364,6 +3566,15 @@ function openPublishAssignmentModal(courseId, classCode) {
   document.getElementById('paDuration').value = '60';
   document.getElementById('paNotes').value = '';
 
+  const createdDisplay = document.getElementById('paCreationDateDisplay');
+  if (createdDisplay) {
+    createdDisplay.textContent = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+  const relDateInp = document.getElementById('paReleaseDate');
+  if (relDateInp) relDateInp.value = '';
+  const relTimeInp = document.getElementById('paReleaseTime');
+  if (relTimeInp) relTimeInp.value = '00:00';
+
   openModal('publishAssignmentModal');
 }
 
@@ -3379,6 +3590,8 @@ async function submitPublishAssignment() {
   const priority = document.getElementById('paPriority').value;
   const duration = parseInt(document.getElementById('paDuration').value) || 60;
   const notes = document.getElementById('paNotes').value.trim();
+  const releaseDate = document.getElementById('paReleaseDate')?.value || '';
+  const releaseTime = document.getElementById('paReleaseTime')?.value || '00:00';
 
   const course = (globalData.recurring || []).find(r => r.id === courseId || r.classCode === classCode);
   if (!course) return;
@@ -3397,7 +3610,9 @@ async function submitPublishAssignment() {
     notes,
     cat: 'assignment',
     done: false,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    releaseDate,
+    releaseTime
   };
 
   course.assignments.unshift(assignmentObj);
@@ -3417,7 +3632,12 @@ async function submitPublishAssignment() {
 
   closeModal('publishAssignmentModal');
   refreshAll();
-  showToast(`📢 Assignment "${title}" published to enrolled students!`, 4000);
+  const isScheduled = releaseDate && releaseDate > todayStr();
+  if (isScheduled) {
+    showToast(`⏳ Assignment "${title}" scheduled for release on ${releaseDate} at ${releaseTime}!`, 4500);
+  } else {
+    showToast(`📢 Assignment "${title}" published to enrolled students!`, 4000);
+  }
 }
 
 // ── Post Course Announcement (Teacher) ──
@@ -3674,7 +3894,8 @@ async function submitJoinCourse() {
       isEnrolled: true,
       assignments: data.assignments || [],
       announcements: data.announcements || [],
-      courseNotes: []
+      courseNotes: [],
+      publicNotes: data.publicNotes || []
     };
 
     if (!Array.isArray(globalData.recurring)) globalData.recurring = [];
@@ -3682,6 +3903,9 @@ async function submitJoinCourse() {
 
     // Sync any published assignments into student's active assignments
     (data.assignments || []).forEach(asgn => {
+      // Scheduled assignments remain hidden until release date
+      if (asgn.releaseDate && asgn.releaseDate > todayStr()) return;
+
       const taskObj = {
         id: asgn.id || uid(),
         courseId: courseObj.id,
@@ -3727,6 +3951,62 @@ function checkUrlForClassCode() {
 }
 
 // ── Student Roster Modal (Teacher) ──
+let _currentRosterStudents = [];
+
+function renderRosterList(students) {
+  const listEl = document.getElementById('classRosterList');
+  if (!listEl) return;
+
+  if (!students.length) {
+    listEl.innerHTML = `
+      <div class="empty-state" style="padding:24px 14px;">
+        <i class="fas fa-search"></i>
+        <h4>No matching students found</h4>
+        <p>Try searching with another name or email keyword.</p>
+      </div>`;
+    return;
+  }
+
+  listEl.innerHTML = students.map(s => {
+    const fullName = s.fullName || s.name || s.username || 'Student';
+    const av = fullName.charAt(0).toUpperCase();
+    const dateStr = s.enrolledAt ? new Date(s.enrolledAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Recently';
+    const uidSnippet = s.uid ? (s.uid.length > 10 ? s.uid.slice(0, 8) + '…' : s.uid) : '';
+
+    return `
+      <div class="roster-student-item">
+        <div class="roster-av">${av}</div>
+        <div class="roster-info">
+          <div class="roster-name" style="display:flex;align-items:center;gap:8px;">
+            <span>${esc(fullName)}</span>
+            ${uidSnippet ? `<span style="font-size:10px;font-family:monospace;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:1px 5px;color:var(--text-light);" title="Firebase UID: ${esc(s.uid)}">UID: ${esc(uidSnippet)}</span>` : ''}
+          </div>
+          <div class="roster-meta">
+            ${s.username && s.username !== fullName ? `<span>@${esc(s.username)}</span>` : ''}
+            ${s.email ? `<span><i class="fas fa-envelope"></i> ${esc(s.email)}</span>` : ''}
+            <span style="margin-left:auto"><i class="fas fa-calendar-check"></i> Enrolled: ${dateStr}</span>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function filterRosterStudents(query) {
+  const q = (query || '').toLowerCase().trim();
+  if (!q) {
+    renderRosterList(_currentRosterStudents);
+    return;
+  }
+  const filtered = _currentRosterStudents.filter(s => {
+    const name = (s.fullName || s.name || '').toLowerCase();
+    const email = (s.email || '').toLowerCase();
+    const username = (s.username || '').toLowerCase();
+    const uid = (s.uid || '').toLowerCase();
+    return name.includes(q) || email.includes(q) || username.includes(q) || uid.includes(q);
+  });
+  renderRosterList(filtered);
+}
+
 async function openClassRosterModal(classCodeOrCourseId) {
   const course = (globalData.recurring || []).find(r => r.classCode === classCodeOrCourseId || r.id === classCodeOrCourseId);
   const classCode = course?.classCode || classCodeOrCourseId;
@@ -3735,10 +4015,14 @@ async function openClassRosterModal(classCodeOrCourseId) {
   document.getElementById('rosterModalSub').textContent = course ? `${course.start}–${course.end} • ${course.location || 'Classroom'}` : 'Student Roster';
   document.getElementById('rosterClassCodeBadge').textContent = `CODE: ${classCode}`;
 
+  const searchInp = document.getElementById('rosterSearchInput');
+  if (searchInp) searchInp.value = '';
+
   const listEl = document.getElementById('classRosterList');
   const countEl = document.getElementById('rosterStudentCount');
 
   let students = course?.enrolledStudents || [];
+  _currentRosterStudents = students;
   if (countEl) countEl.textContent = `${students.length} Student${students.length !== 1 ? 's' : ''} Enrolled`;
 
   if (listEl) {
@@ -3753,22 +4037,7 @@ async function openClassRosterModal(classCodeOrCourseId) {
           </button>
         </div>`;
     } else {
-      listEl.innerHTML = students.map(s => {
-        const av = (s.name || s.username || 'S').charAt(0).toUpperCase();
-        const dateStr = s.enrolledAt ? new Date(s.enrolledAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'Recently';
-        return `
-          <div class="roster-student-item">
-            <div class="roster-av">${av}</div>
-            <div class="roster-info">
-              <div class="roster-name">${esc(s.name || s.username || 'Student')}</div>
-              <div class="roster-meta">
-                ${s.username ? `<span>@${esc(s.username)}</span>` : ''}
-                ${s.email ? `<span><i class="fas fa-envelope"></i> ${esc(s.email)}</span>` : ''}
-                <span style="margin-left:auto"><i class="fas fa-calendar-check"></i> Enrolled: ${dateStr}</span>
-              </div>
-            </div>
-          </div>`;
-      }).join('');
+      renderRosterList(students);
     }
   }
 
@@ -3780,25 +4049,16 @@ async function openClassRosterModal(classCodeOrCourseId) {
       const doc = await firebase.firestore().collection('classrooms').doc(classCode).get();
       if (doc.exists) {
         const fresh = doc.data().enrolledStudents || [];
+        _currentRosterStudents = fresh;
         if (course) course.enrolledStudents = fresh;
         if (countEl) countEl.textContent = `${fresh.length} Student${fresh.length !== 1 ? 's' : ''} Enrolled`;
         if (listEl && fresh.length) {
-          listEl.innerHTML = fresh.map(s => {
-            const av = (s.name || s.username || 'S').charAt(0).toUpperCase();
-            const dateStr = s.enrolledAt ? new Date(s.enrolledAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'Recently';
-            return `
-              <div class="roster-student-item">
-                <div class="roster-av">${av}</div>
-                <div class="roster-info">
-                  <div class="roster-name">${esc(s.name || s.username || 'Student')}</div>
-                  <div class="roster-meta">
-                    ${s.username ? `<span>@${esc(s.username)}</span>` : ''}
-                    ${s.email ? `<span><i class="fas fa-envelope"></i> ${esc(s.email)}</span>` : ''}
-                    <span style="margin-left:auto"><i class="fas fa-calendar-check"></i> Enrolled: ${dateStr}</span>
-                  </div>
-                </div>
-              </div>`;
-          }).join('');
+          const currentSearch = (document.getElementById('rosterSearchInput')?.value || '').trim();
+          if (currentSearch) {
+            filterRosterStudents(currentSearch);
+          } else {
+            renderRosterList(fresh);
+          }
         }
       }
     } catch(e) {}
@@ -3850,18 +4110,26 @@ function initClassroomsRealtimeSync() {
             course.studentUids = classData.studentUids || course.studentUids || [];
             course.assignments = classData.assignments || course.assignments || [];
             course.announcements = classData.announcements || course.announcements || [];
+            course.publicNotes = classData.publicNotes || course.publicNotes || [];
 
             // Alert student if new announcement or assignment arrived live
             if (!isTeacher && change.type === 'modified') {
               if ((course.assignments || []).length > prevAssignmentsCount) {
                 const latestAsgn = course.assignments[0];
-                playNotificationChime();
-                showToast(`📝 [${course.title}] New Assignment: ${latestAsgn.title}`, 4500);
+                if (!latestAsgn.releaseDate || latestAsgn.releaseDate <= todayStr()) {
+                  playNotificationChime();
+                  showToast(`📝 [${course.title}] New Assignment: ${latestAsgn.title}`, 4500);
+                }
               }
               if ((course.announcements || []).length > prevAnnounceCount) {
                 const latestAnn = course.announcements[0];
                 playNotificationChime();
                 showToast(`📢 [${course.title}] Announcement: ${latestAnn.title}`, 4500);
+              }
+              // If courseDetailsModal is open for this course, refresh views
+              if (currentActiveCourseId === course.id) {
+                renderCourseNotes(course);
+                renderCourseAssignments(course);
               }
             }
           } else if (!isTeacher && classData.studentUids && classData.studentUids.includes(user.uid)) {
@@ -3885,7 +4153,8 @@ function initClassroomsRealtimeSync() {
               isEnrolled: true,
               assignments: classData.assignments || [],
               announcements: classData.announcements || [],
-              courseNotes: []
+              courseNotes: [],
+              publicNotes: classData.publicNotes || []
             };
             if (!Array.isArray(globalData.recurring)) globalData.recurring = [];
             globalData.recurring.push(newCourse);
@@ -3910,6 +4179,474 @@ function initClassroomsRealtimeSync() {
 }
 
 // ══════════════════════════════════════════
+// IN-APP COURSE GROUP CHAT & RESOURCES (SPARK PLAN COMPATIBLE)
+// ══════════════════════════════════════════
+let activeChatClassCode = null;
+let activeChatUnsubscribe = null;
+let currentPinnedMessage = null;
+
+function cleanupCourseChatListener() {
+  if (activeChatUnsubscribe) {
+    try { activeChatUnsubscribe(); } catch(e){}
+    activeChatUnsubscribe = null;
+  }
+  activeChatClassCode = null;
+  const linkInp = document.getElementById('chatLinkUrl');
+  if (linkInp) linkInp.value = '';
+  const titleInp = document.getElementById('chatLinkTitle');
+  if (titleInp) titleInp.value = '';
+  const linkDrawer = document.getElementById('chatLinkDrawer');
+  if (linkDrawer) linkDrawer.classList.add('hidden');
+  const codeDrawer = document.getElementById('chatCodeDrawer');
+  if (codeDrawer) codeDrawer.classList.add('hidden');
+}
+
+function initCourseChatListener(classCode) {
+  if (!classCode) return;
+  if (activeChatClassCode === classCode && activeChatUnsubscribe) return;
+
+  cleanupCourseChatListener();
+  activeChatClassCode = classCode;
+
+  const chatScroll = document.getElementById('chatMessagesScroll');
+  if (chatScroll) {
+    chatScroll.innerHTML = `
+      <div style="text-align:center;padding:24px;color:var(--text-light);font-size:12px;">
+        <i class="fas fa-spinner fa-spin"></i> Connecting to course channel…
+      </div>`;
+  }
+
+  if (typeof firebase === 'undefined' || !firebase.apps.length) {
+    renderLocalChatMessages(classCode);
+    return;
+  }
+
+  try {
+    const dbFs = firebase.firestore();
+    activeChatUnsubscribe = dbFs.collection('classrooms')
+      .doc(classCode)
+      .collection('messages')
+      .orderBy('timestamp', 'asc')
+      .limitToLast(100)
+      .onSnapshot(snapshot => {
+        const messages = [];
+        let pinned = null;
+
+        snapshot.forEach(doc => {
+          const d = doc.data();
+          const m = { id: doc.id, ...d };
+          messages.push(m);
+          if (m.isPinned) pinned = m;
+        });
+
+        // Cache messages locally
+        try {
+          localStorage.setItem(`ib_chat_${classCode}`, JSON.stringify(messages.slice(-50)));
+        } catch(e){}
+
+        updateChatPinnedBanner(pinned);
+        renderChatMessages(messages);
+      }, err => {
+        console.warn('Course chat listener note (fallback to cached):', err);
+        renderLocalChatMessages(classCode);
+      });
+  } catch(e) {
+    console.warn('initCourseChatListener exception:', e);
+    renderLocalChatMessages(classCode);
+  }
+}
+
+function renderLocalChatMessages(classCode) {
+  let msgs = [];
+  try {
+    msgs = JSON.parse(localStorage.getItem(`ib_chat_${classCode}`) || '[]');
+  } catch(e){}
+  const pinned = msgs.find(m => m.isPinned);
+  updateChatPinnedBanner(pinned);
+  renderChatMessages(msgs);
+}
+
+function updateChatPinnedBanner(pinnedMsg) {
+  currentPinnedMessage = pinnedMsg;
+  const banner = document.getElementById('chatPinnedBanner');
+  const textEl = document.getElementById('chatPinnedText');
+  const unpinBtn = document.getElementById('btnChatUnpin');
+  if (!banner || !textEl) return;
+
+  if (pinnedMsg) {
+    const isTeacher = isTeacherRole();
+    textEl.textContent = pinnedMsg.text || pinnedMsg.codeSnippet?.code || pinnedMsg.resourceLink?.title || 'Important Course Announcement';
+    if (unpinBtn) unpinBtn.style.display = isTeacher ? 'block' : 'none';
+    banner.classList.remove('hidden');
+  } else {
+    banner.classList.add('hidden');
+  }
+}
+
+async function unpinCurrentCourseMessage() {
+  if (!currentPinnedMessage || !activeChatClassCode) return;
+  await togglePinChatMessage(currentPinnedMessage.id, true);
+}
+
+async function togglePinChatMessage(msgId, currentlyPinned) {
+  if (!isTeacherRole()) {
+    showToast('⚠️ Only instructors can pin announcements.');
+    return;
+  }
+  if (!activeChatClassCode || typeof firebase === 'undefined' || !firebase.apps.length) return;
+
+  try {
+    await firebase.firestore()
+      .collection('classrooms')
+      .doc(activeChatClassCode)
+      .collection('messages')
+      .doc(msgId)
+      .update({
+        isPinned: !currentlyPinned
+      });
+
+    showToast(currentlyPinned ? '📌 Message unpinned.' : '📌 Announcement pinned to channel top!');
+  } catch(e) {
+    console.warn('togglePin error:', e);
+  }
+}
+
+function detectResourceLinkMetadata(url, customTitle = '') {
+  if (!url) return null;
+  let cleanUrl = url.trim();
+  if (!/^https?:\/\//i.test(cleanUrl)) {
+    cleanUrl = 'https://' + cleanUrl;
+  }
+  try {
+    const parsed = new URL(cleanUrl);
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+    let service = 'web';
+    let icon = 'fas fa-globe';
+    let iconClass = '';
+    let badge = host;
+    let fallbackTitle = host + (parsed.pathname !== '/' ? parsed.pathname : '');
+
+    if (host.includes('drive.google.com') || host.includes('docs.google.com')) {
+      service = 'gdrive';
+      icon = 'fab fa-google-drive';
+      iconClass = 'clc-icon-gdrive';
+      badge = 'Google Drive';
+      fallbackTitle = 'Google Drive Resource';
+      if (cleanUrl.includes('/spreadsheets/')) { icon = 'fas fa-table'; badge = 'Google Sheets'; }
+      else if (cleanUrl.includes('/presentation/')) { icon = 'fas fa-file-powerpoint'; badge = 'Google Slides'; }
+      else if (cleanUrl.includes('/document/')) { icon = 'fas fa-file-alt'; badge = 'Google Doc'; }
+    } else if (host.includes('github.com')) {
+      service = 'github';
+      icon = 'fab fa-github';
+      iconClass = 'clc-icon-github';
+      badge = 'GitHub';
+      const parts = parsed.pathname.split('/').filter(Boolean);
+      fallbackTitle = parts.length >= 2 ? `${parts[0]}/${parts[1]}` : 'GitHub Repository';
+    } else if (host.includes('notion.so') || host.includes('notion.site')) {
+      service = 'notion';
+      icon = 'fas fa-book-open';
+      iconClass = 'clc-icon-notion';
+      badge = 'Notion';
+      fallbackTitle = 'Notion Workspace Page';
+    } else if (host.includes('youtube.com') || host.includes('youtu.be')) {
+      service = 'youtube';
+      icon = 'fab fa-youtube';
+      iconClass = 'clc-icon-youtube';
+      badge = 'YouTube';
+      fallbackTitle = 'YouTube Video';
+    } else if (host.includes('dropbox.com')) {
+      service = 'dropbox';
+      icon = 'fab fa-dropbox';
+      iconClass = 'clc-icon-dropbox';
+      badge = 'Dropbox';
+      fallbackTitle = 'Dropbox Shared File';
+    } else if (host.includes('onedrive') || host.includes('sharepoint.com') || host.includes('office.com')) {
+      service = 'microsoft';
+      icon = 'fab fa-microsoft';
+      iconClass = 'clc-icon-microsoft';
+      badge = 'OneDrive / Office';
+      fallbackTitle = 'OneDrive Document';
+    } else if (host.includes('figma.com')) {
+      service = 'figma';
+      icon = 'fab fa-figma';
+      badge = 'Figma';
+      fallbackTitle = 'Figma Design';
+    }
+
+    return {
+      url: cleanUrl,
+      title: customTitle.trim() || fallbackTitle,
+      service,
+      icon,
+      iconClass,
+      badge,
+      domain: host
+    };
+  } catch(e) {
+    return null;
+  }
+}
+
+function extractFirstUrl(text) {
+  if (!text) return null;
+  const match = text.match(/(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/);
+  return match ? match[1] : null;
+}
+
+function formatChatText(text) {
+  if (!text) return '';
+  const escaped = esc(text);
+  const urlRegex = /(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g;
+  return escaped.replace(urlRegex, url => {
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+  });
+}
+
+function renderChatMessages(messages) {
+  const container = document.getElementById('chatMessagesScroll');
+  if (!container) return;
+
+  if (!messages.length) {
+    container.innerHTML = `
+      <div class="empty-state" style="padding:32px 16px;margin:auto;">
+        <i class="fas fa-comments"></i>
+        <h4>Welcome to Course Discussion</h4>
+        <p>Post questions, share study links (Google Drive, GitHub, Notion), or collaborate with code snippets.</p>
+      </div>`;
+    return;
+  }
+
+  const u = getCurrentUser() || CURRENT_USER || {};
+  const currentUid = u.uid || '';
+  const currentName = u.displayName || u.name || u.username || '';
+  const isTeacher = isTeacherRole();
+
+  container.innerHTML = messages.map(m => {
+    const isMe = (m.senderUid && currentUid && m.senderUid === currentUid) || (m.senderName === currentName);
+    const isInstructorMsg = m.senderRole === 'teacher';
+    const initial = (m.senderName || 'U').charAt(0).toUpperCase();
+
+    let timeStr = 'Just now';
+    if (m.timestamp) {
+      const d = m.timestamp.toDate ? m.timestamp.toDate() : new Date(m.timestamp);
+      timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // Determine resource link preview
+    let link = m.resourceLink || null;
+    if (!link && m.text) {
+      const autoUrl = extractFirstUrl(m.text);
+      if (autoUrl) {
+        link = detectResourceLinkMetadata(autoUrl);
+      }
+    }
+
+    return `
+      <div class="chat-message-item ${isMe ? 'chat-msg-right' : 'chat-msg-left'}">
+        <div class="chat-msg-avatar" style="${isInstructorMsg ? 'background:#2E7D32;' : ''}">${initial}</div>
+        <div class="chat-msg-body">
+          <div class="chat-msg-meta">
+            <span class="chat-msg-sender">${esc(m.senderName || 'User')}</span>
+            <span class="chat-role-badge ${isInstructorMsg ? 'chat-role-teacher' : 'chat-role-student'}">
+              <i class="fas ${isInstructorMsg ? 'fa-chalkboard-teacher' : 'fa-user-graduate'}"></i> ${isInstructorMsg ? 'Instructor' : 'Student'}
+            </span>
+            <span class="chat-msg-time">${timeStr}</span>
+          </div>
+
+          <div class="chat-bubble ${isInstructorMsg ? 'chat-instructor-bubble' : ''}">
+            ${isTeacher ? `
+              <div class="chat-msg-actions">
+                <button type="button" class="btn-chat-pin" onclick="togglePinChatMessage('${m.id}', ${!!m.isPinned})" title="${m.isPinned ? 'Unpin message' : 'Pin to top'}">
+                  <i class="fas fa-thumbtack" style="${m.isPinned ? 'color:#FFB300' : ''}"></i>
+                </button>
+              </div>` : ''}
+
+            ${m.text ? `<div class="chat-text-content" style="white-space:pre-wrap;">${formatChatText(m.text)}</div>` : ''}
+
+            ${m.codeSnippet ? `
+              <div class="chat-code-block">
+                <div class="chat-code-header">
+                  <span><i class="fas fa-code"></i> ${esc(m.codeSnippet.lang || 'code')}</span>
+                  <button type="button" class="btn-copy-code" onclick="copyCodeSnippet(this)">
+                    <i class="fas fa-copy"></i> Copy Code
+                  </button>
+                </div>
+                <pre><code>${esc(m.codeSnippet.code)}</code></pre>
+              </div>` : ''}
+
+            ${link ? `
+              <a href="${esc(link.url)}" target="_blank" rel="noopener noreferrer" class="chat-link-card">
+                <div class="clc-icon-wrap ${esc(link.iconClass || '')}">
+                  <i class="${esc(link.icon || 'fas fa-globe')}"></i>
+                </div>
+                <div class="clc-info">
+                  <span class="clc-badge">${esc(link.badge || link.domain || 'Resource')}</span>
+                  <span class="clc-title">${esc(link.title || link.url)}</span>
+                  <span class="clc-url">${esc(link.url)}</span>
+                </div>
+                <div class="clc-action-btn">
+                  <span>Open</span> <i class="fas fa-external-link-alt"></i>
+                </div>
+              </a>` : ''}
+
+            ${m.attachment ? `
+              <a href="${esc(m.attachment.url)}" target="_blank" rel="noopener noreferrer" class="chat-link-card">
+                <div class="clc-icon-wrap">
+                  <i class="fas fa-file-alt"></i>
+                </div>
+                <div class="clc-info">
+                  <span class="clc-badge">Attachment</span>
+                  <span class="clc-title">${esc(m.attachment.name || 'File Attachment')}</span>
+                  <span class="clc-url">${esc(m.attachment.size || 'Download')}</span>
+                </div>
+                <div class="clc-action-btn">
+                  <span>Download</span> <i class="fas fa-arrow-down"></i>
+                </div>
+              </a>` : ''}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Scroll to bottom
+  container.scrollTop = container.scrollHeight;
+}
+
+function copyCodeSnippet(btn) {
+  if (!btn) return;
+  const block = btn.closest('.chat-code-block');
+  const codeEl = block ? block.querySelector('code') : null;
+  const codeText = codeEl ? codeEl.innerText : '';
+  if (!codeText) return;
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(codeText).then(() => {
+      const origHtml = btn.innerHTML;
+      btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+      setTimeout(() => { btn.innerHTML = origHtml; }, 1800);
+      showToast('📋 Code copied to clipboard!');
+    }).catch(() => prompt('Copy code:', codeText));
+  } else {
+    prompt('Copy code:', codeText);
+  }
+}
+
+function toggleCodeDrawer() {
+  const drawer = document.getElementById('chatCodeDrawer');
+  if (drawer) {
+    drawer.classList.toggle('hidden');
+    if (!drawer.classList.contains('hidden')) {
+      const inp = document.getElementById('chatCodeInput');
+      if (inp) inp.focus();
+    }
+  }
+}
+
+function toggleLinkDrawer() {
+  const drawer = document.getElementById('chatLinkDrawer');
+  if (drawer) {
+    drawer.classList.toggle('hidden');
+    if (!drawer.classList.contains('hidden')) {
+      const inp = document.getElementById('chatLinkUrl');
+      if (inp) inp.focus();
+    }
+  }
+}
+
+async function sendCourseChatMessage() {
+  if (!activeChatClassCode) {
+    const course = getCourseById(currentActiveCourseId);
+    if (course && course.classCode) {
+      activeChatClassCode = course.classCode;
+    } else {
+      showToast('⚠️ No Class Code channel available for this course.');
+      return;
+    }
+  }
+
+  const textInp = document.getElementById('chatInputText');
+  const text = (textInp?.value || '').trim();
+
+  const codeInp = document.getElementById('chatCodeInput');
+  const codeLang = document.getElementById('chatCodeLang')?.value || 'python';
+  const codeText = (codeInp?.value || '').trim();
+  const codeSnippet = codeText ? { code: codeText, lang: codeLang } : null;
+
+  const linkUrlInp = document.getElementById('chatLinkUrl');
+  const linkTitleInp = document.getElementById('chatLinkTitle');
+  const rawUrl = (linkUrlInp?.value || '').trim();
+  const rawTitle = (linkTitleInp?.value || '').trim();
+
+  let resourceLink = null;
+  if (rawUrl) {
+    resourceLink = detectResourceLinkMetadata(rawUrl, rawTitle);
+  } else if (!codeSnippet && text) {
+    const foundUrl = extractFirstUrl(text);
+    if (foundUrl) {
+      resourceLink = detectResourceLinkMetadata(foundUrl);
+    }
+  }
+
+  if (!text && !codeSnippet && !resourceLink) {
+    return;
+  }
+
+  const u = getCurrentUser() || CURRENT_USER || {};
+  const senderUid = u.uid || (typeof firebase !== 'undefined' && firebase.auth?.().currentUser?.uid) || uid();
+  const senderName = u.displayName || u.name || u.username || 'Student';
+  const senderRole = isTeacherRole() ? 'teacher' : 'student';
+
+  const messageDoc = {
+    text,
+    senderUid,
+    senderName,
+    senderRole,
+    codeSnippet,
+    resourceLink,
+    isPinned: false,
+    timestamp: typeof firebase !== 'undefined' && firebase.firestore?.FieldValue?.serverTimestamp
+      ? firebase.firestore.FieldValue.serverTimestamp()
+      : new Date().toISOString()
+  };
+
+  // Clear inputs immediately for responsive UX
+  if (textInp) textInp.value = '';
+  if (codeInp) codeInp.value = '';
+  if (linkUrlInp) linkUrlInp.value = '';
+  if (linkTitleInp) linkTitleInp.value = '';
+  const codeDrawer = document.getElementById('chatCodeDrawer');
+  if (codeDrawer) codeDrawer.classList.add('hidden');
+  const linkDrawer = document.getElementById('chatLinkDrawer');
+  if (linkDrawer) linkDrawer.classList.add('hidden');
+
+  if (typeof firebase !== 'undefined' && firebase.apps.length) {
+    try {
+      await firebase.firestore()
+        .collection('classrooms')
+        .doc(activeChatClassCode)
+        .collection('messages')
+        .add(messageDoc);
+    } catch(err) {
+      console.warn('Chat send error (cached locally):', err);
+      const localKey = `ib_chat_${activeChatClassCode}`;
+      let existing = [];
+      try { existing = JSON.parse(localStorage.getItem(localKey) || '[]'); } catch(e){}
+      existing.push({ id: uid(), ...messageDoc, timestamp: new Date().toISOString() });
+      localStorage.setItem(localKey, JSON.stringify(existing));
+      renderLocalChatMessages(activeChatClassCode);
+    }
+  } else {
+    // Pure offline mode
+    const localKey = `ib_chat_${activeChatClassCode}`;
+    let existing = [];
+    try { existing = JSON.parse(localStorage.getItem(localKey) || '[]'); } catch(e){}
+    existing.push({ id: uid(), ...messageDoc, timestamp: new Date().toISOString() });
+    localStorage.setItem(localKey, JSON.stringify(existing));
+    renderLocalChatMessages(activeChatClassCode);
+  }
+}
+
+// ══════════════════════════════════════════
 // PWA
 // ══════════════════════════════════════════
 function initPWA(){
@@ -3927,7 +4664,7 @@ function initPWA(){
 
     if('caches' in window) {
       caches.keys().then(keys => {
-        keys.forEach(k => { if(k !== 'ib-planner-v11') caches.delete(k); });
+        keys.forEach(k => { if(k !== 'ib-planner-v12') caches.delete(k); });
       });
     }
   }
@@ -4000,8 +4737,18 @@ function openModal(id){
 function closeModal(id){
   const el = document.getElementById(id);
   if (el) el.classList.remove('open');
+  if (id === 'courseDetailsModal') {
+    cleanupCourseChatListener();
+  }
 }
-document.addEventListener('click',e=>{if(e.target.classList.contains('modal-overlay'))e.target.classList.remove('open');});
+document.addEventListener('click',e=>{
+  if(e.target.classList.contains('modal-overlay')) {
+    e.target.classList.remove('open');
+    if (e.target.id === 'courseDetailsModal') {
+      cleanupCourseChatListener();
+    }
+  }
+});
 
 // ══════════════════════════════════════════
 // TOAST
@@ -4041,6 +4788,22 @@ function initUserBadge() {
   if (udEmail)  udEmail.textContent  = email ? email : 'Personal Info ›';
 }
 
+function copyStudentUID() {
+  const user = getCurrentUser() || CURRENT_USER || {};
+  const uidVal = user.uid || (typeof firebase !== 'undefined' && firebase.auth?.().currentUser?.uid) || '';
+  if (!uidVal) {
+    showToast('⚠️ No Firebase UID available.');
+    return;
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(uidVal).then(() => {
+      showToast('📋 Account UID copied to clipboard!');
+    }).catch(() => prompt('Copy UID:', uidVal));
+  } else {
+    prompt('Copy UID:', uidVal);
+  }
+}
+
 function openPersonalInfoModal() {
   const user     = getCurrentUser() || CURRENT_USER || {};
   const settings = globalData.settings || {};
@@ -4059,6 +4822,7 @@ function openPersonalInfoModal() {
   const schoolInp = document.getElementById('piSchool');
   const avEl      = document.getElementById('piLargeAvatar');
   const headingEl = document.getElementById('piHeadingName');
+  const uidEl     = document.getElementById('piUidDisplay');
 
   if (nameInp)   nameInp.value   = name;
   if (emailInp)  emailInp.value  = email;
@@ -4068,6 +4832,11 @@ function openPersonalInfoModal() {
   if (schoolInp) schoolInp.value = school;
   if (avEl)      avEl.textContent = (name || 'S').charAt(0).toUpperCase();
   if (headingEl) headingEl.textContent = name || 'Student Profile';
+
+  const uidVal = user.uid || (typeof firebase !== 'undefined' && firebase.auth?.().currentUser?.uid) || '';
+  if (uidEl) {
+    uidEl.textContent = uidVal || 'UID Pending Auth';
+  }
 
   openModal('personalInfoModal');
 }
