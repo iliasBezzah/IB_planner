@@ -601,9 +601,10 @@ function refreshAll() {
   } else {
     renderSchedule();
     renderStats();
-    loadHealthUI();
-    loadMoodUI();
-    loadEnergyUI();
+    renderNextUpBanner();
+    populatePomoCourses();
+    initScratchpad();
+    renderUpcomingExams();
     renderGoals();
   }
 }
@@ -940,6 +941,7 @@ function renderSchedule() {
         ${ev.notes ? `<div style="font-size:11px;color:var(--text-light);margin-top:3px">${esc(ev.notes)}</div>` : ''}
       </div>
       <div class="ev-actions" onclick="event.stopPropagation()">
+        <button class="ev-btn chat-btn" title="Open Class Chat &amp; Messages" onclick="openCourseDiscussion('${ev.recurId || ev.id}')" style="color:var(--primary);"><i class="fas fa-comments"></i></button>
         <button class="ev-btn edit-btn" title="Edit Class Schedule" onclick="editEvent('${ev.id}')"><i class="fas fa-edit"></i></button>
         ${!ev.isRecurring ? `<button class="ev-btn done-btn" title="${ev.done ? 'Undo' : 'Mark done'}" onclick="toggleEventDone('${ev.id}')"><i class="fas fa-${ev.done ? 'undo' : 'check'}"></i></button>` : ''}
         <button class="ev-btn del-btn" title="Delete" onclick="deleteEvent('${ev.id}')"><i class="fas fa-trash"></i></button>
@@ -951,28 +953,50 @@ function renderSchedule() {
 // STATS
 // ══════════════════════════════════════════
 function renderStats() {
-  const events=getEventsForDate(currentDate);
-  const tasks =dayData(currentDate).tasks||[];
-  let totalMins=0;
-  events.forEach(e=>{
-    const[sh,sm]=e.start.split(':').map(Number);
-    const[eh,em]=e.end.split(':').map(Number);
-    totalMins+=(eh*60+em)-(sh*60+sm);
+  const events  = getEventsForDate(currentDate);
+  const tasks   = dayData(currentDate).tasks || [];
+  let totalMins = 0;
+  let lectureCount = 0;
+  events.forEach(e => {
+    const [sh, sm] = e.start.split(':').map(Number);
+    const [eh, em] = e.end.split(':').map(Number);
+    totalMins += (eh * 60 + em) - (sh * 60 + sm);
+    if (e.cat === 'lecture' || e.cat === 'study') lectureCount++;
   });
-  const done   =events.filter(e=>e.done).length;
-  const pending=events.filter(e=>!e.done).length;
-  const highP  =[...events,...tasks].filter(e=>e.priority==='high').length;
-  const breaks =events.filter(e=>e.cat==='break').length;
-  const pct    =events.length?Math.round((done/events.length)*100):0;
+  const done    = events.filter(e => e.done).length;
+  const pending = events.filter(e => !e.done).length + tasks.filter(t => !t.done).length;
+  const highP   = [...events, ...tasks].filter(e => e.priority === 'high').length;
+  const breaks  = events.filter(e => e.cat === 'break').length;
+  const pct     = events.length ? Math.round((done / events.length) * 100) : 0;
 
-  document.getElementById('stat-hours').textContent   =totalMins>=60?`${Math.floor(totalMins/60)}h${totalMins%60?totalMins%60+'m':''}`:`${totalMins}m`;
-  document.getElementById('stat-done').textContent    =done;
-  document.getElementById('stat-pending').textContent =pending;
-  document.getElementById('stat-priority').textContent=highP;
-  document.getElementById('stat-breaks').textContent  =breaks;
-  document.getElementById('stat-progress').textContent=pct+'%';
-  document.getElementById('dayProgressFill').style.width=pct+'%';
-  document.getElementById('dayProgressPct').textContent =pct+'%';
+  const hoursEl = document.getElementById('stat-hours');
+  if (hoursEl) hoursEl.textContent = totalMins >= 60 ? `${Math.floor(totalMins/60)}h${totalMins%60 ? totalMins%60+'m' : ''}` : `${totalMins}m`;
+
+  const lectEl = document.getElementById('stat-lectures-count');
+  if (lectEl) lectEl.textContent = lectureCount;
+
+  const pendEl = document.getElementById('stat-pending');
+  if (pendEl) pendEl.textContent = pending;
+
+  const focusEl = document.getElementById('stat-focus-time');
+  if (focusEl) {
+    const focusMins = (typeof pomoState !== 'undefined' && pomoState.focusedTodayMins) || 0;
+    focusEl.textContent = focusMins >= 60 ? `${Math.floor(focusMins/60)}h ${focusMins%60}m` : `${focusMins}m`;
+  }
+
+  // Gracefully handle legacy IDs if still in DOM
+  const doneEl = document.getElementById('stat-done');
+  if (doneEl) doneEl.textContent = done;
+  const prioEl = document.getElementById('stat-priority');
+  if (prioEl) prioEl.textContent = highP;
+  const brkEl = document.getElementById('stat-breaks');
+  if (brkEl) brkEl.textContent = breaks;
+  const progEl = document.getElementById('stat-progress');
+  if (progEl) progEl.textContent = pct + '%';
+  const fillEl = document.getElementById('dayProgressFill');
+  if (fillEl) fillEl.style.width = pct + '%';
+  const pctEl = document.getElementById('dayProgressPct');
+  if (pctEl) pctEl.textContent = pct + '%';
 }
 
 // ══════════════════════════════════════════
@@ -1659,9 +1683,17 @@ function openCourseDetails(courseId) {
     if (chatScroll) {
       chatScroll.innerHTML = `
         <div class="empty-state" style="padding:28px 14px;">
-          <i class="fas fa-comments"></i>
-          <h4>Local Course</h4>
-          <p>This course does not have an active Class Code channel. Link it with a Class Code to enable real-time discussion and resource sharing.</p>
+          <i class="fas fa-comments" style="font-size:32px;color:var(--text-light);margin-bottom:8px;"></i>
+          <h4>Local Course / Event</h4>
+          <p style="max-width:380px;margin:0 auto 12px;font-size:12px;color:var(--text-light);">This schedule item does not have an active Class Code channel. Real-time class chat requires a course with a Class Code.</p>
+          ${isTeacherRole() ? `
+            <button class="btn-primary btn-sm" onclick="closeModal('courseDetailsModal');openCreateClassroomModal();">
+              <i class="fas fa-chalkboard"></i> Create Course with Class Code
+            </button>` : `
+            <button class="btn-primary btn-sm" onclick="closeModal('courseDetailsModal');openJoinClassroomModal();">
+              <i class="fas fa-plus"></i> Join Course with Class Code
+            </button>`
+          }
         </div>`;
     }
   }
@@ -1681,7 +1713,8 @@ function switchCourseTab(tabName) {
     project: document.getElementById('cdPanelProject'),
     assignments: document.getElementById('cdPanelAssignments'),
     notes: document.getElementById('cdPanelNotes'),
-    discussion: document.getElementById('cdPanelDiscussion')
+    discussion: document.getElementById('cdPanelDiscussion'),
+    grades: document.getElementById('cdPanelGrades')
   };
   Object.keys(panels).forEach(key => {
     if (panels[key]) panels[key].classList.toggle('active', key === tabName);
@@ -1691,7 +1724,17 @@ function switchCourseTab(tabName) {
     if (course && course.classCode) {
       initCourseChatListener(course.classCode);
     }
+  } else if (tabName === 'grades') {
+    const course = getCourseById(currentActiveCourseId);
+    if (course) {
+      renderGradeSimulator(course);
+    }
   }
+}
+
+function openCourseDiscussion(courseId) {
+  openCourseDetails(courseId);
+  switchCourseTab('discussion');
 }
 
 function editCurrentCourseSchedule() {
@@ -2749,6 +2792,31 @@ function renderCourseAssignments(course) {
               </div>` : ''}
           </div>
           ${a.notes ? `<div style="font-size:12px;color:var(--text-light);margin-top:4px;">${esc(a.notes)}</div>` : ''}
+
+          <!-- Deliverable Submission Flow -->
+          ${isTeacher ? `
+            <div style="margin-top:8px;">
+              <button class="btn-secondary btn-sm" onclick="openAssignmentSubmissionsModal('${a.id}', '${course.classCode || ''}')" title="Inspect Student Deliverables">
+                <i class="fas fa-inbox"></i> View Submissions
+              </button>
+            </div>
+          ` : `
+            <div style="margin-top:8px;">
+              ${a.submission ? `
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                  <span class="sub-status-pill submitted"><i class="fas fa-check-circle"></i> Submitted</span>
+                  <a href="${esc(a.submission.url)}" target="_blank" rel="noopener noreferrer" class="sub-link-chip" title="Open submitted deliverable">
+                    <i class="fas fa-external-link-alt"></i> Deliverable Link
+                  </a>
+                  <button class="btn-text-sm" onclick="openSubmitAssignmentModal('${a.id}', '${course.classCode || ''}')" style="font-size:11px;color:var(--text-light);text-decoration:underline;">Update Link</button>
+                </div>
+              ` : `
+                <button class="btn-primary btn-sm" onclick="openSubmitAssignmentModal('${a.id}', '${course.classCode || ''}')">
+                  <i class="fas fa-file-upload"></i> Submit Deliverable
+                </button>
+              `}
+            </div>
+          `}
         </div>
         <div class="cd-ass-actions">
           <button class="ev-btn del-btn" title="Delete Assignment" onclick="deleteCourseAssignment('${a.id}')">
@@ -3445,9 +3513,14 @@ function renderTeacherDashboard() {
               ${e.classCode ? `<span><i class="fas fa-key"></i> ${esc(e.classCode)}</span>` : ''}
             </div>
           </div>
-          <button class="btn-secondary btn-sm" onclick="event.stopPropagation(); openCourseDetails('${e.recurId || e.id}')">
-            View
-          </button>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <button class="btn-secondary btn-sm" onclick="event.stopPropagation(); openCourseDiscussion('${e.recurId || e.id}')" title="Open Class Chat & Messages" style="color:var(--primary);font-weight:600;">
+              <i class="fas fa-comments"></i> Chat
+            </button>
+            <button class="btn-secondary btn-sm" onclick="event.stopPropagation(); openCourseDetails('${e.recurId || e.id}')">
+              View
+            </button>
+          </div>
         </div>
       `).join('');
     }
@@ -3533,6 +3606,9 @@ function renderTeacherDashboard() {
 
         <!-- Teacher Actions Grid -->
         <div class="tcc-actions-grid">
+          <button class="btn-tcc-action" onclick="openCourseDiscussion('${c.id}')" title="Open course group chat & message box" style="color:var(--primary);font-weight:700;">
+            <i class="fas fa-comments"></i> Chat
+          </button>
           <button class="btn-tcc-action" onclick="openPublishAssignmentModal('${c.id}', '${c.classCode || ''}')" title="Create course-wide assignment">
             <i class="fas fa-plus"></i> Assignment
           </button>
@@ -5001,5 +5077,890 @@ document.addEventListener('DOMContentLoaded', () => {
   const name = u ? (u.displayName || u.name || u.username) : '';
   showToast(`🎓 Welcome${name ? ' back, ' + name : ''}! Cloud sync active.`, 3500);
 });
+
+// ════════════════════════════════════════════════════════════════
+// ACADEMIC COMMAND CENTER: NEXT UP & URGENT DEADLINES
+// ════════════════════════════════════════════════════════════════
+function renderNextUpBanner() {
+  const container = document.getElementById('studentNextUpSection');
+  if (!container || isTeacherRole()) return;
+
+  // 1. Immediate Next or Ongoing Lecture Detection
+  const todayEvents = getEventsForDate(currentDate);
+  const now = new Date();
+  const currentHM = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  const isToday = currentDate === todayStr();
+
+  let ongoingEvent = null;
+  let nextEvent = null;
+
+  if (isToday) {
+    for (const e of todayEvents) {
+      if (e.start <= currentHM && e.end > currentHM) {
+        ongoingEvent = e;
+        break;
+      } else if (e.start > currentHM) {
+        if (!nextEvent || e.start < nextEvent.start) {
+          nextEvent = e;
+        }
+      }
+    }
+  } else if (todayEvents.length > 0) {
+    nextEvent = todayEvents[0];
+  }
+
+  const nuTitle = document.getElementById('nuClassTitle');
+  const nuMeta = document.getElementById('nuClassMeta');
+  const nuCard = document.getElementById('cardNextLecture');
+
+  if (ongoingEvent) {
+    if (nuTitle) nuTitle.innerHTML = `<span style="color:#2E7D32">● ONGOING:</span> ${esc(ongoingEvent.title)}`;
+    if (nuMeta) nuMeta.textContent = `${ongoingEvent.start} – ${ongoingEvent.end} (${ongoingEvent.location || 'Classroom / Lab'})`;
+    if (nuCard) {
+      nuCard.style.cursor = 'pointer';
+      nuCard.onclick = () => openCourseDetails(ongoingEvent.recurId || ongoingEvent.id);
+    }
+  } else if (nextEvent) {
+    let diffMsg = '';
+    if (isToday) {
+      const [eh, em] = nextEvent.start.split(':').map(Number);
+      const diffMins = (eh * 60 + em) - (now.getHours() * 60 + now.getMinutes());
+      if (diffMins > 0) {
+        const dh = Math.floor(diffMins / 60);
+        const dm = diffMins % 60;
+        diffMsg = dh > 0 ? ` (in ${dh}h ${dm}m)` : ` (in ${dm} mins)`;
+      }
+    }
+    if (nuTitle) nuTitle.textContent = `${nextEvent.title}${diffMsg}`;
+    if (nuMeta) nuMeta.textContent = `${nextEvent.start} – ${nextEvent.end} • ${nextEvent.location || 'Classroom / Campus'}`;
+    if (nuCard) {
+      nuCard.style.cursor = 'pointer';
+      nuCard.onclick = () => openCourseDetails(nextEvent.recurId || nextEvent.id);
+    }
+  } else {
+    if (nuTitle) nuTitle.textContent = todayEvents.length > 0 ? '✨ All lectures completed for today!' : 'No scheduled lectures today';
+    if (nuMeta) nuMeta.textContent = todayEvents.length > 0 ? 'Great job! Enjoy your study blocks or rest.' : 'Schedule a study block or add routine classes.';
+    if (nuCard) {
+      nuCard.style.cursor = 'default';
+      nuCard.onclick = null;
+    }
+  }
+
+  // 2. Urgent / Closest Deadline Detection
+  const allAssignments = [];
+  (globalData.recurring || []).forEach(r => {
+    (r.assignments || []).forEach(a => {
+      if (!a.done) {
+        allAssignments.push({ ...a, courseTitle: r.title, courseId: r.id, classCode: r.classCode });
+      }
+    });
+  });
+
+  const udTitle = document.getElementById('udAssignmentTitle');
+  const udMeta = document.getElementById('udAssignmentMeta');
+  const udPill = document.getElementById('udCountdownPill');
+  const udCard = document.getElementById('cardUrgentDeadline');
+
+  if (allAssignments.length > 0) {
+    allAssignments.sort((a, b) => {
+      const da = (a.dueDate || a.due || '9999') + 'T' + (a.dueTime || '23:59');
+      const db = (b.dueDate || b.due || '9999') + 'T' + (b.dueTime || '23:59');
+      return da.localeCompare(db);
+    });
+
+    const closest = allAssignments[0];
+    const dueDate = closest.dueDate || closest.due;
+    const dueTime = closest.dueTime || '23:59';
+    const dueFull = new Date(`${dueDate}T${dueTime}`);
+    const nowMs = now.getTime();
+    const diffHours = Math.round((dueFull - nowMs) / (1000 * 60 * 60));
+
+    if (udTitle) udTitle.textContent = closest.title;
+    if (udMeta) udMeta.textContent = `${closest.courseTitle} • Due ${formatDateShort(dueDate)} at ${dueTime}`;
+
+    if (udPill) {
+      udPill.classList.remove('urgent');
+      if (diffHours < 0) {
+        udPill.textContent = `🚨 Overdue (${Math.abs(Math.round(diffHours / 24))}d ago)`;
+        udPill.classList.add('urgent');
+      } else if (diffHours <= 24) {
+        udPill.textContent = `⚠️ Due Today (${diffHours}h left)`;
+        udPill.classList.add('urgent');
+      } else {
+        const days = Math.round(diffHours / 24);
+        udPill.textContent = `⏳ Due in ${days} day${days !== 1 ? 's' : ''}`;
+      }
+    }
+
+    if (udCard) {
+      udCard.style.cursor = 'pointer';
+      udCard.onclick = () => {
+        openCourseDetails(closest.courseId);
+        switchCourseTab('assignments');
+      };
+    }
+  } else {
+    if (udTitle) udTitle.textContent = '✨ No pending assignments';
+    if (udMeta) udMeta.textContent = 'All course assignments & deliverables are up to date!';
+    if (udPill) {
+      udPill.textContent = 'All clear';
+      udPill.classList.remove('urgent');
+    }
+    if (udCard) {
+      udCard.style.cursor = 'default';
+      udCard.onclick = null;
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// STUDY FOCUS TIMER (POMODORO)
+// ════════════════════════════════════════════════════════════════
+let pomoState = {
+  interval: null,
+  remainingSeconds: 25 * 60,
+  totalSeconds: 25 * 60,
+  mode: 'focus', // 'focus', 'shortBreak', 'longBreak'
+  isRunning: false,
+  focusedTodayMins: parseInt(localStorage.getItem('ib_pomo_today_mins_' + todayStr()) || '0')
+};
+
+function populatePomoCourses() {
+  const sel = document.getElementById('pomoCourseSelect');
+  if (!sel) return;
+  const currentVal = sel.value;
+  const courses = globalData.recurring || [];
+  sel.innerHTML = `<option value="general">📚 General Study / Reading</option>` +
+    courses.map(c => `<option value="${c.id}">${CAT_ICONS[c.cat] || '🎓'} ${esc(c.title)}</option>`).join('');
+  if (currentVal && Array.from(sel.options).some(o => o.value === currentVal)) {
+    sel.value = currentVal;
+  }
+}
+
+function setPomodoroMode(mode, mins) {
+  if (pomoState.interval) {
+    clearInterval(pomoState.interval);
+    pomoState.interval = null;
+    pomoState.isRunning = false;
+  }
+  pomoState.mode = mode;
+  pomoState.remainingSeconds = mins * 60;
+  pomoState.totalSeconds = mins * 60;
+
+  document.querySelectorAll('.pomo-preset-btn').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.mins) === mins);
+  });
+
+  const badge = document.getElementById('pomoModeBadge');
+  const sub = document.getElementById('pomoSubLabel');
+  const btnStart = document.getElementById('btnPomoStart');
+
+  if (mode === 'focus') {
+    if (badge) badge.textContent = 'Focus Session';
+    if (sub) sub.textContent = 'Ready to begin study block';
+  } else if (mode === 'shortBreak') {
+    if (badge) badge.textContent = 'Short Break';
+    if (sub) sub.textContent = 'Step away, hydrate, and stretch';
+  } else if (mode === 'longBreak') {
+    if (badge) badge.textContent = 'Long Rest';
+    if (sub) sub.textContent = 'Relax, walk around, or grab a snack';
+  }
+
+  if (btnStart) btnStart.innerHTML = `<i class="fas fa-play"></i> Start ${mode === 'focus' ? 'Focus' : 'Break'}`;
+  updatePomoDisplay();
+}
+
+function togglePomodoro() {
+  if (pomoState.isRunning) {
+    pausePomodoro();
+  } else {
+    startPomodoro();
+  }
+}
+
+function startPomodoro() {
+  if (pomoState.isRunning) return;
+  pomoState.isRunning = true;
+  const btnStart = document.getElementById('btnPomoStart');
+  if (btnStart) btnStart.innerHTML = `<i class="fas fa-pause"></i> Pause`;
+
+  const sub = document.getElementById('pomoSubLabel');
+  if (sub) sub.textContent = pomoState.mode === 'focus' ? '🔥 Focus in progress...' : '☕ Enjoy your break...';
+
+  pomoState.interval = setInterval(() => {
+    pomoState.remainingSeconds--;
+    updatePomoDisplay();
+
+    if (pomoState.remainingSeconds <= 0) {
+      clearInterval(pomoState.interval);
+      pomoState.interval = null;
+      pomoState.isRunning = false;
+      onPomodoroCompleted();
+    }
+  }, 1000);
+}
+
+function pausePomodoro() {
+  if (pomoState.interval) {
+    clearInterval(pomoState.interval);
+    pomoState.interval = null;
+  }
+  pomoState.isRunning = false;
+  const btnStart = document.getElementById('btnPomoStart');
+  if (btnStart) btnStart.innerHTML = `<i class="fas fa-play"></i> Resume`;
+  const sub = document.getElementById('pomoSubLabel');
+  if (sub) sub.textContent = 'Paused';
+}
+
+function resetPomodoro() {
+  if (pomoState.interval) {
+    clearInterval(pomoState.interval);
+    pomoState.interval = null;
+  }
+  pomoState.isRunning = false;
+  pomoState.remainingSeconds = pomoState.totalSeconds;
+  const btnStart = document.getElementById('btnPomoStart');
+  if (btnStart) btnStart.innerHTML = `<i class="fas fa-play"></i> Start ${pomoState.mode === 'focus' ? 'Focus' : 'Break'}`;
+  const sub = document.getElementById('pomoSubLabel');
+  if (sub) sub.textContent = 'Timer reset';
+  updatePomoDisplay();
+}
+
+function updatePomoDisplay() {
+  const el = document.getElementById('pomoTimeDisplay');
+  if (!el) return;
+  const m = Math.floor(pomoState.remainingSeconds / 60);
+  const s = pomoState.remainingSeconds % 60;
+  el.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function onPomodoroCompleted() {
+  try {
+    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+    audio.play().catch(() => {});
+  } catch(e) {}
+
+  if (pomoState.mode === 'focus') {
+    const elapsedMins = Math.round(pomoState.totalSeconds / 60);
+    pomoState.focusedTodayMins += elapsedMins;
+    localStorage.setItem('ib_pomo_today_mins_' + todayStr(), pomoState.focusedTodayMins);
+
+    // Identify target course
+    const sel = document.getElementById('pomoCourseSelect');
+    const courseId = sel ? sel.value : 'general';
+    const course = (globalData.recurring || []).find(c => c.id === courseId);
+    const courseTitle = course ? course.title : 'Study & Revision';
+
+    // Insert logged study event in today's timetable
+    const now = new Date();
+    const endStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+    const startObj = new Date(now.getTime() - elapsedMins * 60000);
+    const startStr = String(startObj.getHours()).padStart(2, '0') + ':' + String(startObj.getMinutes()).padStart(2, '0');
+
+    if (!dayData(currentDate).events) dayData(currentDate).events = [];
+    dayData(currentDate).events.push({
+      id: uid(),
+      title: `Pomodoro: ${courseTitle}`,
+      start: startStr,
+      end: endStr,
+      cat: 'study',
+      color: course ? course.color : '#1565C0',
+      done: true,
+      recurId: course ? course.id : ''
+    });
+    save();
+    refreshAll();
+
+    showToast(`🎉 Focus session completed! ${elapsedMins} mins added to ${courseTitle} study hours.`, 5000);
+    setPomodoroMode('shortBreak', 5);
+  } else {
+    showToast('☕ Break finished! Ready for the next focus session?', 4500);
+    setPomodoroMode('focus', 25);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// QUICK SCRATCHPAD
+// ════════════════════════════════════════════════════════════════
+let scratchpadSaveTimer = null;
+
+function initScratchpad() {
+  const el = document.getElementById('scratchpadInput');
+  if (!el) return;
+  const saved = localStorage.getItem('ib_scratchpad') || '';
+  if (el.value !== saved && document.activeElement !== el) {
+    el.value = saved;
+  }
+}
+
+function handleScratchpadInput() {
+  const status = document.getElementById('scratchpadStatus');
+  if (status) status.innerHTML = `<i class="fas fa-sync fa-spin"></i> Saving...`;
+  clearTimeout(scratchpadSaveTimer);
+  scratchpadSaveTimer = setTimeout(() => {
+    const val = document.getElementById('scratchpadInput')?.value || '';
+    localStorage.setItem('ib_scratchpad', val);
+    if (status) status.innerHTML = `<i class="fas fa-check"></i> Saved`;
+  }, 350);
+}
+
+function copyScratchpad() {
+  const val = document.getElementById('scratchpadInput')?.value || '';
+  if (!val.trim()) { showToast('⚠️ Scratchpad is empty.'); return; }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(val).then(() => {
+      showToast('📋 Scratchpad copied to clipboard!');
+    }).catch(() => {
+      showToast('⚠️ Could not copy to clipboard.');
+    });
+  } else {
+    showToast('📋 Scratchpad ready.');
+  }
+}
+
+function clearScratchpad() {
+  if (!confirm('Clear all scratchpad text?')) return;
+  const el = document.getElementById('scratchpadInput');
+  if (el) el.value = '';
+  localStorage.setItem('ib_scratchpad', '');
+  const status = document.getElementById('scratchpadStatus');
+  if (status) status.innerHTML = `<i class="fas fa-check"></i> Cleared`;
+  showToast('🗑️ Scratchpad cleared.');
+}
+
+// ════════════════════════════════════════════════════════════════
+// UPCOMING EXAMS & REVISION SCHEDULER
+// ════════════════════════════════════════════════════════════════
+function renderUpcomingExams() {
+  const list = document.getElementById('upcomingExamsList');
+  if (!list) return;
+
+  const exams = [];
+  const today = todayStr();
+
+  // Search across calendar events for exam category
+  for (const date in db) {
+    if (date >= today && db[date]?.events) {
+      db[date].events.forEach(e => {
+        if (e.cat === 'exam' || /exam|test|midterm|final|quiz/i.test(e.title)) {
+          exams.push({ ...e, examDate: date });
+        }
+      });
+    }
+  }
+
+  // Also check course assignments marked as exam or test
+  (globalData.recurring || []).forEach(r => {
+    (r.assignments || []).forEach(a => {
+      const d = a.dueDate || a.due;
+      if (d && d >= today && (a.cat === 'exam' || /exam|test|midterm|final|quiz/i.test(a.title))) {
+        exams.push({
+          id: a.id,
+          title: a.title,
+          examDate: d,
+          recurId: r.id,
+          color: r.color,
+          courseTitle: r.title
+        });
+      }
+    });
+  });
+
+  if (!exams.length) {
+    list.innerHTML = `
+      <div style="padding:14px 10px;text-align:center;font-size:12px;color:var(--text-light)">
+        No upcoming exams or tests scheduled.
+      </div>`;
+    return;
+  }
+
+  exams.sort((a, b) => a.examDate.localeCompare(b.examDate));
+
+  list.innerHTML = exams.slice(0, 5).map(e => {
+    const d1 = new Date(today + 'T00:00:00');
+    const d2 = new Date(e.examDate + 'T00:00:00');
+    const diffDays = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+    let badgeText = `In ${diffDays} days`;
+    if (diffDays === 0) badgeText = '🚨 Today!';
+    else if (diffDays === 1) badgeText = '⚠️ Tomorrow!';
+
+    const course = getCourseById(e.recurId);
+    const courseName = course ? course.title : (e.courseTitle || 'Assessment');
+
+    return `
+      <div class="exam-item">
+        <div class="exam-item-left">
+          <span class="exam-item-title">${esc(e.title)}</span>
+          <span class="exam-item-meta">${esc(courseName)} • ${formatDateShort(e.examDate)}</span>
+        </div>
+        <div class="exam-item-right">
+          <span class="exam-countdown-badge">${badgeText}</span>
+          <button class="btn-schedule-revision" onclick="scheduleRevisionSession('${e.recurId || ''}', '${esc(e.title)}')">
+            <i class="fas fa-calendar-plus"></i> Revise
+          </button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function scheduleRevisionSession(courseId, examTitle) {
+  const course = getCourseById(courseId);
+  const courseName = course ? course.title : 'Exam Revision';
+  const color = course ? course.color : '#1565C0';
+
+  if (!dayData(currentDate).events) dayData(currentDate).events = [];
+
+  const revEvent = {
+    id: uid(),
+    title: `Revision: ${courseName} (${examTitle})`,
+    start: '16:00',
+    end: '18:00',
+    cat: 'study',
+    color,
+    done: false,
+    recurId: courseId || '',
+    notes: `Focused revision session for ${examTitle}`
+  };
+
+  dayData(currentDate).events.push(revEvent);
+  save();
+  refreshAll();
+  showToast(`📅 2-hour revision block scheduled for ${courseName} on ${formatDateShort(currentDate)}!`, 4500);
+}
+
+// ════════════════════════════════════════════════════════════════
+// GPA & COURSE GRADE SIMULATOR
+// ════════════════════════════════════════════════════════════════
+function renderGradeSimulator(course) {
+  if (!course) return;
+
+  if (!Array.isArray(course.gradeComponents) || !course.gradeComponents.length) {
+    course.gradeComponents = [
+      { id: uid(), name: 'Midterm Exam', weight: 30, maxMarks: 100, earnedMarks: 85, status: 'graded' },
+      { id: uid(), name: 'Lab Reports / IA', weight: 30, maxMarks: 100, earnedMarks: 90, status: 'graded' },
+      { id: uid(), name: 'Final Exam', weight: 40, maxMarks: 100, earnedMarks: null, status: 'pending' }
+    ];
+    save();
+  }
+
+  let totalGradedWeight = 0;
+  let totalWeightedScore = 0;
+  let totalWeight = 0;
+
+  course.gradeComponents.forEach(c => {
+    totalWeight += c.weight;
+    if (c.status === 'graded' && c.earnedMarks !== null && c.earnedMarks !== undefined) {
+      totalGradedWeight += c.weight;
+      totalWeightedScore += (c.earnedMarks / c.maxMarks) * c.weight;
+    }
+  });
+
+  const currentAveragePct = totalGradedWeight > 0 ? (totalWeightedScore / totalGradedWeight) * 100 : 0;
+  let gradeLetter = '--';
+  if (totalGradedWeight > 0) {
+    if (currentAveragePct >= 85) gradeLetter = 'IB 7 (A+)';
+    else if (currentAveragePct >= 75) gradeLetter = 'IB 6 (A)';
+    else if (currentAveragePct >= 65) gradeLetter = 'IB 5 (B)';
+    else if (currentAveragePct >= 50) gradeLetter = 'IB 4 (C)';
+    else if (currentAveragePct >= 40) gradeLetter = 'IB 3 (D)';
+    else if (currentAveragePct >= 30) gradeLetter = 'IB 2 (E)';
+    else gradeLetter = 'IB 1 (F)';
+  }
+
+  const avgEl = document.getElementById('gscCurrentAverage');
+  const gradEl = document.getElementById('gscGradedWeight');
+  const letEl = document.getElementById('gscGradeLetter');
+  const wtBadge = document.getElementById('gcwTotalWeightBadge');
+
+  if (avgEl) avgEl.textContent = `${currentAveragePct.toFixed(1)}%`;
+  if (gradEl) gradEl.textContent = `${totalGradedWeight}% of grade evaluated`;
+  if (letEl) letEl.textContent = gradeLetter;
+  if (wtBadge) wtBadge.textContent = `Total Weight: ${totalWeight}% / 100%`;
+
+  const listEl = document.getElementById('gradeComponentsList');
+  if (listEl) {
+    listEl.innerHTML = course.gradeComponents.map((c, idx) => {
+      const isGraded = c.status === 'graded';
+      const pct = isGraded && c.earnedMarks !== null ? ((c.earnedMarks / c.maxMarks) * 100).toFixed(1) + '%' : 'Pending / Final';
+      return `
+        <div class="gc-item">
+          <div>
+            <div class="gc-item-title">${esc(c.name)} <span class="gcw-weight-pill">${c.weight}% Weight</span></div>
+            <div class="gc-item-meta">
+              <span>Status: <b>${isGraded ? 'Graded' : 'Upcoming Exam'}</b></span>
+              <span>Marks: ${isGraded ? `${c.earnedMarks} / ${c.maxMarks}` : `Max ${c.maxMarks}`}</span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span class="gc-score-badge" style="background:${isGraded ? '#E8F5E9' : '#FFF3E0'};color:${isGraded ? '#2E7D32' : '#E65100'};">
+              ${pct}
+            </span>
+            <button class="ev-btn del-btn" onclick="deleteGradeComponent(${idx})" title="Remove Component">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  calculateFinalExamTarget();
+}
+
+function calculateFinalExamTarget() {
+  const course = getCourseById(currentActiveCourseId);
+  if (!course || !course.gradeComponents) return;
+
+  const targetScale = document.getElementById('simTargetGradeSelect')?.value || '6';
+  const targetThresholds = { '7': 85, '6': 75, '5': 65, '4': 50 };
+  const targetPct = targetThresholds[targetScale] || 75;
+
+  let earnedPoints = 0;
+  let remainingWeight = 0;
+
+  course.gradeComponents.forEach(c => {
+    if (c.status === 'graded' && c.earnedMarks !== null) {
+      earnedPoints += (c.earnedMarks / c.maxMarks) * c.weight;
+    } else {
+      remainingWeight += c.weight;
+    }
+  });
+
+  const banner = document.getElementById('gradeTargetBanner');
+  const title = document.getElementById('gtbTargetTitle');
+  const desc = document.getElementById('gtbTargetDesc');
+  if (!banner || !title || !desc) return;
+
+  banner.className = 'grade-target-banner';
+
+  if (remainingWeight <= 0) {
+    title.textContent = 'All assessments have been graded!';
+    desc.textContent = `Your final completed score is ${earnedPoints.toFixed(1)}%. No further exam components remain.`;
+    return;
+  }
+
+  const pointsNeeded = targetPct - earnedPoints;
+  const requiredScorePct = (pointsNeeded / remainingWeight) * 100;
+
+  if (requiredScorePct <= 0) {
+    title.textContent = `🎉 IB ${targetScale} Target Secured!`;
+    desc.textContent = `You have already accumulated ${earnedPoints.toFixed(1)} points. Even with 0% on remaining assessments, your score will meet the ${targetPct}% threshold!`;
+  } else if (requiredScorePct <= 100) {
+    banner.classList.add('highlight');
+    title.textContent = `🎯 Final Exam Target: ${requiredScorePct.toFixed(1)}% Required`;
+    desc.textContent = `You need to score at least ${requiredScorePct.toFixed(1)}% on the remaining ${remainingWeight}% assessment weight to secure an IB ${targetScale} (${targetPct}% overall).`;
+  } else {
+    banner.classList.add('danger');
+    const maxPossible = (earnedPoints + remainingWeight).toFixed(1);
+    title.textContent = `⚠️ Target IB ${targetScale} Out of Reach`;
+    desc.textContent = `Achieving ${targetPct}% would require a mathematically impossible ${requiredScorePct.toFixed(1)}% on remaining exams. Highest attainable score is ${maxPossible}%.`;
+  }
+}
+
+function openAddGradeComponentModal() {
+  document.getElementById('gcName').value = '';
+  document.getElementById('gcWeight').value = '25';
+  document.getElementById('gcMaxMarks').value = '100';
+  document.getElementById('gcEarnedMarks').value = '';
+  document.getElementById('gcStatus').value = 'graded';
+  openModal('addGradeComponentModal');
+}
+
+function saveGradeComponent() {
+  const course = getCourseById(currentActiveCourseId);
+  if (!course) return;
+
+  const name = document.getElementById('gcName').value.trim();
+  const weight = parseFloat(document.getElementById('gcWeight').value) || 0;
+  const maxMarks = parseFloat(document.getElementById('gcMaxMarks').value) || 100;
+  const earnedRaw = document.getElementById('gcEarnedMarks').value;
+  const earnedMarks = earnedRaw !== '' ? parseFloat(earnedRaw) : null;
+  const status = document.getElementById('gcStatus').value;
+
+  if (!name) { showToast('⚠️ Component name is required.'); return; }
+  if (weight <= 0 || weight > 100) { showToast('⚠️ Weight must be between 1% and 100%.'); return; }
+
+  if (!Array.isArray(course.gradeComponents)) course.gradeComponents = [];
+  course.gradeComponents.push({
+    id: uid(),
+    name,
+    weight,
+    maxMarks,
+    earnedMarks,
+    status
+  });
+
+  save();
+  closeModal('addGradeComponentModal');
+  renderGradeSimulator(course);
+  showToast(`✅ "${name}" added to grade simulator!`);
+}
+
+function deleteGradeComponent(idx) {
+  const course = getCourseById(currentActiveCourseId);
+  if (!course || !course.gradeComponents) return;
+  course.gradeComponents.splice(idx, 1);
+  save();
+  renderGradeSimulator(course);
+  showToast('🗑️ Component removed.');
+}
+
+// ════════════════════════════════════════════════════════════════
+// ASSIGNMENT DELIVERABLE SUBMISSIONS & INSTRUCTOR ROSTER
+// ════════════════════════════════════════════════════════════════
+function openSubmitAssignmentModal(assignmentId, classCode) {
+  const course = getCourseById(currentActiveCourseId);
+  if (!course) return;
+  const a = (course.assignments || []).find(x => x.id === assignmentId);
+  if (!a) return;
+
+  document.getElementById('samAssignmentId').value = assignmentId;
+  document.getElementById('samCourseId').value = course.id;
+  document.getElementById('samClassCode').value = classCode || course.classCode || '';
+
+  const titleEl = document.getElementById('samModalTitle');
+  const subEl = document.getElementById('samCourseTitleDisplay');
+  if (titleEl) titleEl.innerHTML = `<i class="fas fa-file-upload"></i> Submit: ${esc(a.title)}`;
+  if (subEl) subEl.textContent = `${course.title} • Due: ${formatDateShort(a.dueDate || a.due)} at ${a.dueTime || '23:59'}`;
+
+  const urlInp = document.getElementById('samDeliverableUrl');
+  const comInp = document.getElementById('samComments');
+  if (urlInp) urlInp.value = a.submission ? a.submission.url : '';
+  if (comInp) comInp.value = a.submission ? a.submission.comments : '';
+
+  openModal('submitAssignmentModal');
+}
+
+async function submitAssignmentDeliverable() {
+  const assignmentId = document.getElementById('samAssignmentId').value;
+  const courseId = document.getElementById('samCourseId').value;
+  const classCode = document.getElementById('samClassCode').value;
+  const url = document.getElementById('samDeliverableUrl').value.trim();
+  const comments = document.getElementById('samComments').value.trim();
+  const markDone = document.getElementById('samMarkDone').checked;
+
+  if (!url) {
+    showToast('⚠️ Please provide a valid deliverable link.');
+    return;
+  }
+
+  const course = getCourseById(courseId);
+  if (!course || !course.assignments) return;
+
+  const a = course.assignments.find(x => x.id === assignmentId);
+  if (!a) return;
+
+  const user = getCurrentUser() || CURRENT_USER || {};
+  const studentUid = user.uid || (typeof firebase !== 'undefined' && firebase.auth?.().currentUser?.uid) || uid();
+  const studentName = user.displayName || user.name || user.username || 'Student';
+
+  const submissionObj = {
+    url,
+    comments,
+    submittedAt: new Date().toISOString(),
+    studentUid,
+    studentName,
+    assignmentTitle: a.title
+  };
+
+  a.submission = submissionObj;
+  if (markDone) a.done = true;
+  save();
+
+  // Push to Firestore if classCode is active
+  if (classCode && typeof firebase !== 'undefined' && firebase.apps.length) {
+    try {
+      await firebase.firestore().collection('classrooms').doc(classCode).collection('submissions')
+        .doc(`${assignmentId}_${studentUid}`).set(submissionObj);
+    } catch (e) {
+      console.warn('Submission sync warning:', e);
+    }
+  }
+
+  closeModal('submitAssignmentModal');
+  renderCourseAssignments(course);
+  refreshAll();
+  showToast('🚀 Deliverable submitted successfully to your instructor!', 4500);
+}
+
+async function openAssignmentSubmissionsModal(assignmentId, classCode) {
+  const course = getCourseById(currentActiveCourseId);
+  if (!course) return;
+
+  const a = (course.assignments || []).find(x => x.id === assignmentId);
+  if (!a) return;
+
+  document.getElementById('asmModalTitle').innerHTML = `<i class="fas fa-tasks"></i> Submissions: ${esc(a.title)}`;
+  document.getElementById('asmAssignmentSub').textContent = `${course.title} • Class Code: ${classCode || 'Local'}`;
+  document.getElementById('asmDueBadge').textContent = `DUE: ${formatDateShort(a.dueDate || a.due)} ${a.dueTime || ''}`;
+
+  const wrap = document.getElementById('asmRosterWrap');
+  if (wrap) wrap.innerHTML = `<div style="text-align:center;padding:24px;"><i class="fas fa-spinner fa-spin"></i> Fetching student deliverables...</div>`;
+
+  openModal('assignmentSubmissionsModal');
+
+  let submissions = [];
+  if (classCode && typeof firebase !== 'undefined' && firebase.apps.length) {
+    try {
+      const snap = await firebase.firestore().collection('classrooms').doc(classCode).collection('submissions').get();
+      snap.forEach(doc => {
+        if (doc.id.startsWith(assignmentId + '_')) {
+          submissions.push(doc.data());
+        }
+      });
+    } catch(e) {
+      console.warn('Fetch submissions warning:', e);
+    }
+  }
+
+  if (!submissions.length && a.submission) {
+    submissions.push(a.submission);
+  }
+
+  const enrolled = course.enrolledStudents || [];
+  const countBadge = document.getElementById('asmSubmissionCountBadge');
+  if (countBadge) countBadge.textContent = `${submissions.length} / ${Math.max(enrolled.length, submissions.length)} Submitted`;
+
+  if (!submissions.length) {
+    if (wrap) wrap.innerHTML = `
+      <div class="empty-state" style="padding:28px 14px;">
+        <i class="fas fa-inbox" style="font-size:32px;color:var(--text-light);margin-bottom:8px;"></i>
+        <h4>No Deliverables Submitted Yet</h4>
+        <p style="font-size:12px;color:var(--text-light);">Enrolled students have not submitted deliverables for this assignment yet.</p>
+      </div>`;
+    return;
+  }
+
+  if (wrap) {
+    wrap.innerHTML = `
+      <table class="sub-roster-table">
+        <thead>
+          <tr>
+            <th>Student Name</th>
+            <th>Submission Date</th>
+            <th>Status</th>
+            <th>Deliverable</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${submissions.map(s => `
+            <tr>
+              <td><strong>${esc(s.studentName || 'Student')}</strong></td>
+              <td>${s.submittedAt ? new Date(s.submittedAt).toLocaleString() : '—'}</td>
+              <td><span class="sub-status-pill submitted">Submitted</span></td>
+              <td>
+                <a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer" class="sub-link-chip">
+                  <i class="fas fa-external-link-alt"></i> Open Work
+                </a>
+              </td>
+              <td style="font-size:11px;color:var(--text-light);max-width:200px;">${esc(s.comments || '—')}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// GOOGLE CALENDAR / ICAL EXPORT (.ICS)
+// ════════════════════════════════════════════════════════════════
+function exportScheduleICS() {
+  const pad = n => String(n).padStart(2, '0');
+  const formatICSDate = (dStr, tStr) => {
+    const [y, m, d] = (dStr || todayStr()).split('-').map(Number);
+    const [hh, mm] = (tStr || '00:00').split(':').map(Number);
+    return `${y}${pad(m)}${pad(d)}T${pad(hh)}${pad(mm)}00`;
+  };
+
+  const dayMap = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+  const now = new Date();
+  const nowICS = `${now.getUTCFullYear()}${pad(now.getUTCMonth()+1)}${pad(now.getUTCDate())}T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}Z`;
+
+  let ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//IB Planner//Academic Timetable//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'X-WR-CALNAME:IB Academic Schedule',
+    'X-WR-TIMEZONE:UTC'
+  ];
+
+  // 1. Recurring Classes
+  (globalData.recurring || []).forEach(r => {
+    const startStr = r.startDate || todayStr();
+    const dtStart = formatICSDate(startStr, r.start);
+    const dtEnd = formatICSDate(startStr, r.end);
+
+    let rrule = '';
+    if (r.freq === 'weekly' && Array.isArray(r.days) && r.days.length) {
+      const byDays = r.days.map(d => dayMap[d]).join(',');
+      rrule = `RRULE:FREQ=WEEKLY;BYDAY=${byDays}` + (r.endDate ? `;UNTIL=${formatICSDate(r.endDate, '23:59')}Z` : '');
+    } else if (r.freq === 'daily') {
+      rrule = 'RRULE:FREQ=DAILY' + (r.endDate ? `;UNTIL=${formatICSDate(r.endDate, '23:59')}Z` : '');
+    }
+
+    ics.push('BEGIN:VEVENT');
+    ics.push(`UID:recur-${r.id}@ibplanner.edu`);
+    ics.push(`DTSTAMP:${nowICS}`);
+    ics.push(`DTSTART:${dtStart}`);
+    ics.push(`DTEND:${dtEnd}`);
+    if (rrule) ics.push(rrule);
+    ics.push(`SUMMARY:${r.title}`);
+    ics.push(`DESCRIPTION:Category: ${r.cat || 'Lecture'} • Class Code: ${r.classCode || 'Local'}`);
+    if (r.location) ics.push(`LOCATION:${r.location}`);
+    ics.push('END:VEVENT');
+
+    // 2. Course Assignments
+    (r.assignments || []).forEach(a => {
+      const due = a.dueDate || a.due;
+      if (due) {
+        const dtDue = formatICSDate(due, a.dueTime || '23:59');
+        ics.push('BEGIN:VEVENT');
+        ics.push(`UID:asgn-${a.id}@ibplanner.edu`);
+        ics.push(`DTSTAMP:${nowICS}`);
+        ics.push(`DTSTART:${dtDue}`);
+        ics.push(`DTEND:${dtDue}`);
+        ics.push(`SUMMARY:[DUE] ${a.title} (${r.title})`);
+        ics.push(`DESCRIPTION:Assignment due for ${r.title}. ${a.notes || ''}`);
+        ics.push('END:VEVENT');
+      }
+    });
+  });
+
+  // 3. One-off specific calendar events
+  for (const date in db) {
+    if (db[date]?.events) {
+      db[date].events.forEach(e => {
+        if (!e.recurId) {
+          const dtStart = formatICSDate(date, e.start);
+          const dtEnd = formatICSDate(date, e.end);
+          ics.push('BEGIN:VEVENT');
+          ics.push(`UID:event-${e.id}@ibplanner.edu`);
+          ics.push(`DTSTAMP:${nowICS}`);
+          ics.push(`DTSTART:${dtStart}`);
+          ics.push(`DTEND:${dtEnd}`);
+          ics.push(`SUMMARY:${e.title}`);
+          ics.push(`DESCRIPTION:Category: ${e.cat || 'General'}. ${e.notes || ''}`);
+          if (e.location) ics.push(`LOCATION:${e.location}`);
+          ics.push('END:VEVENT');
+        }
+      });
+    }
+  }
+
+  ics.push('END:VCALENDAR');
+
+  const icsBlob = new Blob([ics.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+  const downloadLink = document.createElement('a');
+  downloadLink.href = URL.createObjectURL(icsBlob);
+  downloadLink.download = `IB_Academic_Schedule_${todayStr()}.ics`;
+  document.body.appendChild(downloadLink);
+  downloadLink.click();
+  document.body.removeChild(downloadLink);
+
+  showToast('📅 Academic schedule exported (.ics)! Ready for Google Calendar or Outlook.', 4500);
+}
+
 
 

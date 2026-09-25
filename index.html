@@ -14,7 +14,7 @@
   <link rel="manifest" href="manifest.json"/>
   <link rel="apple-touch-icon" href="icon-192.svg"/>
 
-  <link rel="stylesheet" href="style.css?v=13"/>
+  <link rel="stylesheet" href="style.css?v=15"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
 </head>
 <body>
@@ -75,6 +75,9 @@
       <i class="fas fa-cloud" id="cloudSyncStatus"></i>
       <span class="sync-status-text" id="syncStatusText">Synced</span>
     </button>
+    <button class="btn-role-action" id="btnExportIcsHeader" onclick="exportScheduleICS()" title="Export Schedule (.ics for Google/Apple Calendar)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px;font-size:12px;border-radius:20px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+      <i class="fas fa-calendar-alt" style="color:var(--primary);"></i> <span>Export (.ics)</span>
+    </button>
     <div class="clock-box" id="liveClock"></div>
 
     <!-- In-App Notification Center Bell -->
@@ -119,6 +122,9 @@
         <button class="ud-item" onclick="pullFromCloud(false); closeUserDropdown();">
           <i class="fas fa-sync-alt"></i> <span>Sync Data Now</span>
         </button>
+        <button class="ud-item" onclick="exportScheduleICS(); closeUserDropdown();">
+          <i class="fas fa-calendar-alt"></i> <span>Export Schedule (.ics)</span>
+        </button>
         <button class="ud-item" onclick="openPersonalInfoModal(); closeUserDropdown();">
           <i class="fas fa-user-edit"></i> <span>Personal Information</span>
         </button>
@@ -161,39 +167,49 @@
         <button class="btn-primary" onclick="goToday()"><i class="fas fa-calendar-day"></i> Today</button>
       </div>
 
-      <!-- Stats Row -->
-      <div class="stats-row">
-        <div class="stat-card" style="--accent:#1565C0">
-          <i class="fas fa-book-open"></i>
-          <div><span class="stat-num" id="stat-hours">0h</span><span class="stat-lbl">Study Hours</span></div>
+      <!-- ─── Academic Command Center: Next Up & Urgent Deadline Banner ─── -->
+      <div class="next-up-container" id="studentNextUpSection">
+        <div class="next-up-card" id="cardNextLecture">
+          <div class="nuc-badge"><i class="fas fa-clock"></i> NEXT UP</div>
+          <div class="nuc-content">
+            <h3 id="nuClassTitle">Checking timetable...</h3>
+            <p id="nuClassMeta">Scanning your daily academic schedule</p>
+          </div>
+          <div class="nuc-action">
+            <button class="btn-secondary btn-sm" id="btnNextClassAction" onclick="openAddEventModal()"><i class="fas fa-calendar-plus"></i> Add Event</button>
+          </div>
         </div>
-        <div class="stat-card" style="--accent:#0288D1">
-          <i class="fas fa-check-double"></i>
-          <div><span class="stat-num" id="stat-done">0</span><span class="stat-lbl">Done</span></div>
-        </div>
-        <div class="stat-card" style="--accent:#0097A7">
-          <i class="fas fa-hourglass-half"></i>
-          <div><span class="stat-num" id="stat-pending">0</span><span class="stat-lbl">To Do</span></div>
-        </div>
-        <div class="stat-card" style="--accent:#C62828">
-          <i class="fas fa-exclamation-circle"></i>
-          <div><span class="stat-num" id="stat-priority">0</span><span class="stat-lbl">Urgent</span></div>
-        </div>
-        <div class="stat-card" style="--accent:#5D4037">
-          <i class="fas fa-coffee"></i>
-          <div><span class="stat-num" id="stat-breaks">0</span><span class="stat-lbl">Breaks</span></div>
-        </div>
-        <div class="stat-card" style="--accent:#283593">
-          <i class="fas fa-graduation-cap"></i>
-          <div><span class="stat-num" id="stat-progress">0%</span><span class="stat-lbl">Day Progress</span></div>
+
+        <div class="urgent-deadline-card" id="cardUrgentDeadline">
+          <div class="udc-badge"><i class="fas fa-exclamation-triangle"></i> CLOSEST DEADLINE</div>
+          <div class="udc-content">
+            <h3 id="udAssignmentTitle">Checking deadlines...</h3>
+            <p id="udAssignmentMeta">Scanning course assignments and milestones</p>
+          </div>
+          <div class="udc-action">
+            <span class="deadline-countdown-pill" id="udCountdownPill">✨ Checking...</span>
+          </div>
         </div>
       </div>
 
-      <!-- Progress Bar -->
-      <div class="day-progress-bar">
-        <div class="dpb-label"><i class="fas fa-graduation-cap"></i> Academic Day Progress</div>
-        <div class="dpb-track"><div class="dpb-fill" id="dayProgressFill"></div></div>
-        <span id="dayProgressPct">0%</span>
+      <!-- Academic Summary Pill Bar -->
+      <div class="academic-summary-bar">
+        <div class="asb-item">
+          <i class="fas fa-book-reader" style="color:var(--primary);"></i>
+          <span>Study Today: <strong id="stat-hours">0h</strong></span>
+        </div>
+        <div class="asb-item">
+          <i class="fas fa-calendar-check" style="color:#0288D1;"></i>
+          <span>Lectures Today: <strong id="stat-lectures-count">0</strong></span>
+        </div>
+        <div class="asb-item">
+          <i class="fas fa-tasks" style="color:#0097A7;"></i>
+          <span>Pending Tasks: <strong id="stat-pending">0</strong></span>
+        </div>
+        <div class="asb-item">
+          <i class="fas fa-stopwatch" style="color:#E65100;"></i>
+          <span>Pomodoro Focus: <strong id="stat-focus-time">0m</strong></span>
+        </div>
       </div>
 
       <!-- Dashboard Grid -->
@@ -226,108 +242,73 @@
           <div class="schedule-list" id="scheduleList"></div>
         </div>
 
-        <!-- Right Column -->
+        <!-- Right Column: Academic Productivity Suite -->
         <div class="right-col">
 
-          <!-- Quick Add -->
-          <div class="panel panel-quick">
-            <div class="panel-header"><h2><i class="fas fa-plus-circle"></i> Quick Add</h2></div>
-            <div class="quick-form">
-              <input type="text" id="quickTitle" placeholder="e.g. Math Lecture, Study session…"/>
-              <div class="quick-row">
-                <input type="time" id="quickStart" value="08:00"/>
-                <span>→</span>
-                <input type="time" id="quickEnd" value="10:00"/>
-              </div>
-              <select id="quickCat">
-                <option value="lecture">🎓 Lecture</option>
-                <option value="study">📖 Study</option>
-                <option value="assignment">📝 Assignment</option>
-                <option value="exam">📋 Exam / Test</option>
-                <option value="group">🤝 Study Group</option>
-                <option value="library">📚 Library</option>
-                <option value="break">☕ Break</option>
-                <option value="meal">🍽️ Meal</option>
-                <option value="sport">🏃 Sport</option>
-                <option value="social">🎉 Social</option>
-                <option value="personal">🧘 Personal</option>
-                <option value="travel">🚗 Travel</option>
-              </select>
-              <button class="btn-primary full-width" onclick="quickAdd()"><i class="fas fa-bolt"></i> Quick Add</button>
+          <!-- 1. STUDY FOCUS TIMER (POMODORO) -->
+          <div class="panel panel-pomodoro" id="pomodoroWidget">
+            <div class="panel-header">
+              <h2><i class="fas fa-stopwatch"></i> Study Focus Timer</h2>
+              <span class="pomo-mode-badge" id="pomoModeBadge">Focus Session</span>
             </div>
-          </div>
+            <div class="pomo-body">
+              <!-- Course Selector -->
+              <div class="pomo-course-box">
+                <label for="pomoCourseSelect"><i class="fas fa-graduation-cap"></i> Target Subject / Course:</label>
+                <select id="pomoCourseSelect" class="pomo-select">
+                  <option value="general">📚 General Study</option>
+                </select>
+              </div>
 
-          <!-- Mood & Energy -->
-          <div class="panel panel-mood">
-            <div class="panel-header"><h2><i class="fas fa-smile"></i> Mood &amp; Energy</h2></div>
-            <div class="mood-grid">
-              <div class="mood-section">
-                <label>Morning Mood</label>
-                <div class="emoji-row" id="moodMorningRow">
-                  <span class="emoji-opt" data-val="😔" onclick="setMood('moodMorning','😔',this)">😔</span>
-                  <span class="emoji-opt" data-val="😐" onclick="setMood('moodMorning','😐',this)">😐</span>
-                  <span class="emoji-opt" data-val="🙂" onclick="setMood('moodMorning','🙂',this)">🙂</span>
-                  <span class="emoji-opt" data-val="😊" onclick="setMood('moodMorning','😊',this)">😊</span>
-                  <span class="emoji-opt" data-val="🤩" onclick="setMood('moodMorning','🤩',this)">🤩</span>
-                </div>
+              <!-- Presets -->
+              <div class="pomo-presets">
+                <button class="pomo-preset-btn active" id="pomoPresetFocus" data-mins="25" onclick="setPomodoroMode('focus', 25)">25m Focus</button>
+                <button class="pomo-preset-btn" id="pomoPresetShort" data-mins="5" onclick="setPomodoroMode('shortBreak', 5)">5m Break</button>
+                <button class="pomo-preset-btn" id="pomoPresetLong" data-mins="15" onclick="setPomodoroMode('longBreak', 15)">15m Rest</button>
               </div>
-              <div class="mood-section">
-                <label>Evening Mood</label>
-                <div class="emoji-row" id="moodEveningRow">
-                  <span class="emoji-opt" data-val="😔" onclick="setMood('moodEvening','😔',this)">😔</span>
-                  <span class="emoji-opt" data-val="😐" onclick="setMood('moodEvening','😐',this)">😐</span>
-                  <span class="emoji-opt" data-val="🙂" onclick="setMood('moodEvening','🙂',this)">🙂</span>
-                  <span class="emoji-opt" data-val="😊" onclick="setMood('moodEvening','😊',this)">😊</span>
-                  <span class="emoji-opt" data-val="🤩" onclick="setMood('moodEvening','🤩',this)">🤩</span>
-                </div>
+
+              <!-- Timer Display -->
+              <div class="pomo-display-wrap">
+                <div class="pomo-timer-display" id="pomoTimeDisplay">25:00</div>
+                <div class="pomo-sub-label" id="pomoSubLabel">Ready to begin study block</div>
               </div>
-              <div class="mood-section full">
-                <label>Focus &amp; Energy Level</label>
-                <input type="range" min="1" max="10" value="5" id="energySlider" oninput="saveEnergy(this.value)" class="energy-slider"/>
-                <div class="energy-labels"><span>Low</span><span id="energyVal">5</span><span>High</span></div>
+
+              <!-- Controls -->
+              <div class="pomo-controls">
+                <button class="btn-primary pomo-btn-start" id="btnPomoStart" onclick="togglePomodoro()">
+                  <i class="fas fa-play"></i> Start Focus
+                </button>
+                <button class="btn-secondary pomo-btn-reset" onclick="resetPomodoro()" title="Reset Timer">
+                  <i class="fas fa-redo"></i> Reset
+                </button>
               </div>
             </div>
           </div>
 
-          <!-- Health Tracker -->
-          <div class="panel panel-health">
-            <div class="panel-header"><h2><i class="fas fa-heartbeat"></i> Daily Tracker</h2></div>
-            <div class="health-grid">
-              <div class="health-item">
-                <i class="fas fa-tint" style="color:#42A5F5"></i>
-                <label>Water (glasses)</label>
-                <div class="counter-row">
-                  <button onclick="adjustCounter('water',-1)">−</button>
-                  <span id="water-count">0</span>
-                  <button onclick="adjustCounter('water',1)">+</button>
-                </div>
+          <!-- 2. QUICK SCRATCHPAD -->
+          <div class="panel panel-scratchpad" id="scratchpadWidget">
+            <div class="panel-header">
+              <h2><i class="fas fa-pencil-alt"></i> Quick Scratchpad</h2>
+              <span class="scratchpad-status" id="scratchpadStatus"><i class="fas fa-check"></i> Saved</span>
+            </div>
+            <div class="scratchpad-body">
+              <textarea id="scratchpadInput" placeholder="Quick thoughts, formulas, scratch notes, or reminders..." oninput="handleScratchpadInput()"></textarea>
+              <div class="scratchpad-footer">
+                <button class="btn-text-sm" onclick="copyScratchpad()"><i class="fas fa-copy"></i> Copy</button>
+                <button class="btn-text-sm" onclick="clearScratchpad()"><i class="fas fa-eraser"></i> Clear</button>
               </div>
-              <div class="health-item">
-                <i class="fas fa-apple-alt" style="color:#66BB6A"></i>
-                <label>Meals</label>
-                <div class="counter-row">
-                  <button onclick="adjustCounter('meals',-1)">−</button>
-                  <span id="meals-count">0</span>
-                  <button onclick="adjustCounter('meals',1)">+</button>
-                </div>
-              </div>
-              <div class="health-item">
-                <i class="fas fa-running" style="color:#FFA726"></i>
-                <label>Sport (min)</label>
-                <div class="counter-row">
-                  <button onclick="adjustCounter('exercise',-15)">−</button>
-                  <span id="exercise-count">0</span>
-                  <button onclick="adjustCounter('exercise',15)">+</button>
-                </div>
-              </div>
-              <div class="health-item">
-                <i class="fas fa-moon" style="color:#AB47BC"></i>
-                <label>Sleep (hrs)</label>
-                <div class="counter-row">
-                  <button onclick="adjustCounter('sleep',-0.5)">−</button>
-                  <span id="sleep-count">0</span>
-                  <button onclick="adjustCounter('sleep',0.5)">+</button>
-                </div>
+            </div>
+          </div>
+
+          <!-- 3. UPCOMING EXAMS & REVISION SCHEDULER -->
+          <div class="panel panel-exams" id="upcomingExamsWidget">
+            <div class="panel-header">
+              <h2><i class="fas fa-file-signature"></i> Upcoming Exams</h2>
+              <button class="btn-text-sm" onclick="openAddEventModal()"><i class="fas fa-plus"></i> Add</button>
+            </div>
+            <div class="exams-list" id="upcomingExamsList">
+              <div class="empty-state-sm" style="padding:14px 10px;text-align:center;font-size:12px;color:var(--text-light)">
+                No upcoming exams scheduled.
               </div>
             </div>
           </div>
@@ -975,7 +956,10 @@
         <i class="fas fa-book-open"></i> <span>Course Notes (<span id="cdNoteCount">0</span>)</span>
       </button>
       <button class="course-tab-btn" data-tab="discussion" onclick="switchCourseTab('discussion')">
-        <i class="fas fa-comments"></i> <span>Discussion &amp; Resources</span>
+        <i class="fas fa-comments"></i> <span>Messages &amp; Chat</span>
+      </button>
+      <button class="course-tab-btn" data-tab="grades" onclick="switchCourseTab('grades')">
+        <i class="fas fa-calculator"></i> <span>Grade Simulator</span>
       </button>
     </div>
 
@@ -1016,6 +1000,22 @@
       <!-- TAB 4: In-App Course Group Chat / Discussion & Resources (Telegram Alternative) -->
       <div class="course-tab-panel" id="cdPanelDiscussion">
         <div class="chat-container">
+          <!-- Chat Channel Top Header -->
+          <div class="chat-channel-header" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface2);border-radius:10px;margin-bottom:10px;border:1px solid var(--border);">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:var(--primary);color:#fff;font-size:13px;"><i class="fas fa-comments"></i></span>
+              <div>
+                <div style="font-weight:700;font-size:13px;color:var(--text);display:flex;align-items:center;gap:6px;">
+                  <span>Course Group Chat &amp; Discussion</span>
+                  <span style="background:#e8f5e9;color:#2e7d32;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700;">● LIVE</span>
+                </div>
+                <div style="font-size:11px;color:var(--text-light);margin-top:1px;">Share messages, code snippets, and resource links with your class</div>
+              </div>
+            </div>
+            <div style="font-size:11px;color:var(--text-light);display:flex;align-items:center;gap:4px;">
+              <i class="fas fa-shield-alt" style="color:var(--primary);"></i> Spark Cloud Sync
+            </div>
+          </div>
           <!-- Pinned Announcement Banner (if any) -->
           <div class="chat-pinned-banner hidden" id="chatPinnedBanner">
             <div class="cpb-icon"><i class="fas fa-thumbtack"></i></div>
@@ -1077,6 +1077,65 @@
             <button type="button" class="btn-primary btn-chat-send" onclick="sendCourseChatMessage()" title="Send Message">
               <i class="fas fa-paper-plane"></i>
             </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 5: GPA & Course Grade Simulator -->
+      <div class="course-tab-panel" id="cdPanelGrades">
+        <div class="cd-section-head">
+          <div>
+            <h3><i class="fas fa-calculator"></i> Course Grade Calculator &amp; Target Simulator</h3>
+            <p style="font-size:12px;color:var(--text-light);margin-top:2px">Configure assessment weights, log earned marks, and compute the exact score required on your final exam.</p>
+          </div>
+          <button class="btn-primary btn-sm" onclick="openAddGradeComponentModal()">
+            <i class="fas fa-plus"></i> Add Component
+          </button>
+        </div>
+
+        <div class="grade-sim-container">
+          <!-- Grade Standing Summary Cards -->
+          <div class="grade-summary-cards">
+            <div class="gsc-card">
+              <span class="gsc-label">Current Weighted Standing</span>
+              <div class="gsc-value" id="gscCurrentAverage">0.0%</div>
+              <span class="gsc-sub" id="gscGradedWeight">0% graded so far</span>
+            </div>
+            <div class="gsc-card">
+              <span class="gsc-label">Current Grade Equivalent</span>
+              <div class="gsc-value" id="gscGradeLetter">--</div>
+              <span class="gsc-sub" id="gscGradeScale">IB 1–7 scale</span>
+            </div>
+            <div class="gsc-card highlight">
+              <span class="gsc-label">Target Goal</span>
+              <div class="gsc-target-select-wrap">
+                <select id="simTargetGradeSelect" onchange="calculateFinalExamTarget()">
+                  <option value="7">IB 7 (85%+)</option>
+                  <option value="6" selected>IB 6 (75%+)</option>
+                  <option value="5">IB 5 (65%+)</option>
+                  <option value="4">IB 4 (50%+ Pass)</option>
+                </select>
+              </div>
+              <span class="gsc-sub" id="simTargetSubText">Target standing</span>
+            </div>
+          </div>
+
+          <!-- Target Simulator Result Banner -->
+          <div class="grade-target-banner" id="gradeTargetBanner">
+            <div class="gtb-icon"><i class="fas fa-bullseye"></i></div>
+            <div class="gtb-content">
+              <div class="gtb-title" id="gtbTargetTitle">Final Exam Target Required</div>
+              <div class="gtb-desc" id="gtbTargetDesc">Configure grading weights and scores below to simulate final exam targets.</div>
+            </div>
+          </div>
+
+          <!-- Components Table -->
+          <div class="grade-components-wrap">
+            <div class="gcw-header">
+              <h4>Assessment Weights &amp; Scores</h4>
+              <span id="gcwTotalWeightBadge" class="gcw-weight-pill">Total Weight: 0% / 100%</span>
+            </div>
+            <div class="grade-components-list" id="gradeComponentsList"></div>
           </div>
         </div>
       </div>
@@ -1530,6 +1589,116 @@
   </div>
 </div>
 
+<!-- ══════════════ SUBMIT ASSIGNMENT DELIVERABLE MODAL (STUDENT) ══════════════ -->
+<div class="modal-overlay" id="submitAssignmentModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <h3 id="samModalTitle"><i class="fas fa-file-upload"></i> Submit Assignment Deliverable</h3>
+        <p class="modal-subtitle" id="samCourseTitleDisplay"></p>
+      </div>
+      <button class="modal-close" onclick="closeModal('submitAssignmentModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="samAssignmentId"/>
+      <input type="hidden" id="samCourseId"/>
+      <input type="hidden" id="samClassCode"/>
+
+      <div class="form-group">
+        <label>Deliverable Link *</label>
+        <input type="url" id="samDeliverableUrl" placeholder="https://drive.google.com/... or GitHub / Notion / Figma URL"/>
+        <small style="font-size:11px;color:var(--text-light);display:block;margin-top:3px;">
+          Share a Google Drive link, GitHub repository, Figma board, or Notion document with view access.
+        </small>
+      </div>
+
+      <div class="form-group">
+        <label>Submission Comments / Notes (Optional)</label>
+        <textarea id="samComments" rows="3" placeholder="Add any notes, commit hashes, or context for your instructor..."></textarea>
+      </div>
+
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input type="checkbox" id="samMarkDone" checked/>
+          <span style="font-size:13px;font-weight:600;">Mark assignment as completed</span>
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('submitAssignmentModal')">Cancel</button>
+      <button class="btn-primary" onclick="submitAssignmentDeliverable()"><i class="fas fa-paper-plane"></i> Submit to Instructor</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ ASSIGNMENT SUBMISSION ROSTER MODAL (INSTRUCTOR) ══════════════ -->
+<div class="modal-overlay" id="assignmentSubmissionsModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div>
+        <h3 id="asmModalTitle"><i class="fas fa-tasks"></i> Student Deliverable Submissions</h3>
+        <p class="modal-subtitle" id="asmAssignmentSub">Assignment Roster &amp; Links</p>
+      </div>
+      <button class="modal-close" onclick="closeModal('assignmentSubmissionsModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="roster-header-box">
+        <div class="rh-code-badge" id="asmDueBadge">DUE: —</div>
+        <div class="rh-count-badge" id="asmSubmissionCountBadge">0 / 0 Submitted</div>
+      </div>
+      <div class="submission-roster-wrap" id="asmRosterWrap">
+        <!-- Submissions table -->
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-primary" onclick="closeModal('assignmentSubmissionsModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ ADD GRADE COMPONENT MODAL (STUDENT) ══════════════ -->
+<div class="modal-overlay" id="addGradeComponentModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3><i class="fas fa-plus-circle"></i> Add Assessment Component</h3>
+      <button class="modal-close" onclick="closeModal('addGradeComponentModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Component Name *</label>
+        <input type="text" id="gcName" placeholder="e.g. Midterm Exam, IA / Lab Report, Paper 1..."/>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Weight (% of Total Grade) *</label>
+          <input type="number" id="gcWeight" min="1" max="100" placeholder="e.g. 30"/>
+        </div>
+        <div class="form-group">
+          <label>Max Marks</label>
+          <input type="number" id="gcMaxMarks" min="1" value="100"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Score Earned (Leave empty if upcoming)</label>
+          <input type="number" id="gcEarnedMarks" min="0" step="0.5" placeholder="e.g. 85"/>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="gcStatus">
+            <option value="graded">Graded / Completed</option>
+            <option value="pending">Upcoming / Final Exam</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('addGradeComponentModal')">Cancel</button>
+      <button class="btn-primary" onclick="saveGradeComponent()"><i class="fas fa-check"></i> Add Component</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -1544,7 +1713,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js?v=13"></script>
-<script src="app.js?v=13"></script>
+<script src="firebase-config.js?v=15"></script>
+<script src="app.js?v=15"></script>
 </body>
 </html>
