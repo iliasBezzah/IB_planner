@@ -1,41 +1,46 @@
 {
-  "name": "IB Day Programme Manager",
-  "short_name": "IB Planner",
-  "description": "Full day programme manager — schedule, tasks, notes, contacts and analytics.",
+  "name": "Gradia — Academic Workspace & Collaboration Hub",
+  "short_name": "Gradia",
+  "description": "Comprehensive academic workspace for higher education — schedule management, course hubs, assignments, grade simulation, and collaborative projects.",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#0D47A1",
-  "theme_color": "#1565C0",
+  "background_color": "#0F172A",
+  "theme_color": "#0F172A",
   "orientation": "any",
   "lang": "en",
-  "categories": ["productivity", "education", "lifestyle"],
+  "categories": ["education", "productivity", "academic"],
   "icons": [
     {
-      "src": "icon-192.svg",
+      "src": "icon-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icon-512.svg",
+      "src": "icon-512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
     }
   ],
   "shortcuts": [
     {
-      "name": "Dashboard",
-      "short_name": "Dashboard",
-      "description": "Open today's dashboard",
+      "name": "Academic Workspace",
+      "short_name": "Workspace",
+      "description": "Open your academic schedule and courses",
       "url": "./index.html#dashboard",
       "icons": [{ "src": "icon-192.svg", "sizes": "192x192" }]
     },
     {
-      "name": "Add Event",
-      "short_name": "Add Event",
-      "description": "Quickly add a new event",
-      "url": "./index.html#add",
+      "name": "Course Assignments",
+      "short_name": "Assignments",
+      "description": "View upcoming deliverables and deadlines",
+      "url": "./index.html#tasks",
       "icons": [{ "src": "icon-192.svg", "sizes": "192x192" }]
     }
   ]

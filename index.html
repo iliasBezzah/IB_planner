@@ -3,18 +3,19 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-  <title>IB – Student Day Planner</title>
+  <title>Gradia — Academic Workspace &amp; Collaboration Hub</title>
 
   <!-- PWA Meta Tags -->
-  <meta name="theme-color" content="#1565C0"/>
+  <meta name="theme-color" content="#0F172A"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-  <meta name="apple-mobile-web-app-title" content="IB Student"/>
-  <meta name="description" content="Student day planner — timetable, assignments, notes, study tracking and analytics."/>
+  <meta name="apple-mobile-web-app-title" content="Gradia"/>
+  <meta name="description" content="Gradia — Academic Workspace &amp; Collaboration Hub. Timetable, courses, assignments, collaboration, and analytics."/>
   <link rel="manifest" href="manifest.json"/>
-  <link rel="apple-touch-icon" href="icon-192.svg"/>
+  <link rel="icon" type="image/png" href="favicon.png"/>
+  <link rel="apple-touch-icon" href="icon-192.png"/>
 
-  <link rel="stylesheet" href="style.css?v=15"/>
+  <link rel="stylesheet" href="style.css?v=16"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
 </head>
 <body>
@@ -44,10 +45,10 @@
 <!-- ══════════════ HEADER ══════════════ -->
 <header class="site-header">
   <div class="logo">
-    <div class="logo-ib">IB</div>
+    <img src="logo-mark.png" alt="Gradia Logo" class="logo-gradia-img"/>
     <div class="logo-text">
-      <span class="brand-title">IB Planner</span>
-      <span class="brand-sub" id="brandSub">Full Day Academic Manager</span>
+      <span class="brand-title">Gradia</span>
+      <span class="brand-sub" id="brandSub">Academic Workspace &amp; Collaboration Hub</span>
     </div>
   </div>
 
@@ -791,7 +792,7 @@
           <i class="fas fa-download"></i> Install App on this Device
         </button>
         <small style="display:block; color:var(--text-light); font-size:11px; margin-top:5px;">
-          Installs IB Planner as a standalone app on your smartphone, tablet, or laptop.
+          Installs Gradia as a standalone app on your smartphone, tablet, or laptop.
         </small>
       </div>
     </div>
@@ -883,14 +884,14 @@
 <div class="modal-overlay" id="installHelpModal">
   <div class="modal">
     <div class="modal-header">
-      <h3><i class="fas fa-download"></i> Install IB Student Planner</h3>
+      <h3><i class="fas fa-download"></i> Install Gradia Workspace</h3>
       <button class="modal-close" onclick="closeModal('installHelpModal')"><i class="fas fa-times"></i></button>
     </div>
     <div class="modal-body">
       <div style="text-align:center;padding:10px 0 16px">
-        <div style="width:52px;height:52px;background:#1565C0;color:#fff;font-weight:900;font-size:24px;border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px">IB</div>
+        <img src="logo-mark.png" alt="Gradia Logo" style="width:58px;height:58px;object-fit:contain;margin:0 auto 10px;display:block;filter:drop-shadow(0 6px 16px rgba(0,0,0,0.35));"/>
         <h4 style="margin:0 0 4px">Install on your Phone or PC</h4>
-        <p style="font-size:12px;color:var(--text-light);margin:0">Use IB Planner like a native mobile or desktop app without downloading from an app store.</p>
+        <p style="font-size:12px;color:var(--text-light);margin:0">Use Gradia like a native mobile or desktop app without downloading from an app store.</p>
       </div>
 
       <div class="install-guide-step">
@@ -910,10 +911,10 @@
       </div>
 
       <div class="install-guide-step">
-        <div class="igs-icon"><i class="fas fa-laptop"></i></div>
+        <div class="igs-icon"><i class="fab fa-laptop"></i></div>
         <div class="igs-text">
           <b>PC / Mac (Chrome / Edge)</b>
-          <p>Click the <b>Install</b> icon (<i class="fas fa-download"></i>) in the browser address bar at the top right, or menu <b>⋮ → Install IB Planner</b>.</p>
+          <p>Click the <b>Install</b> icon (<i class="fas fa-download"></i>) in the browser address bar at the top right, or menu <b>⋮ → Install Gradia</b>.</p>
         </div>
       </div>
     </div>
@@ -1713,7 +1714,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js?v=15"></script>
-<script src="app.js?v=15"></script>
+<script src="firebase-config.js?v=16"></script>
+<script src="app.js?v=16"></script>
 </body>
 </html>

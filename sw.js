@@ -1,8 +1,8 @@
 /* ╔══════════════════════════════════════════════════════╗
-   ║  IB Day Programme — Service Worker (PWA Offline)    ║
+   ║  Gradia — Academic Workspace & Hub (PWA Offline)     ║
    ╚══════════════════════════════════════════════════════╝ */
 
-const CACHE_NAME = 'ib-planner-v15';
+const CACHE_NAME = 'gradia-v16';
 const ASSETS = [
   './',
   './index.html',
@@ -11,6 +11,11 @@ const ASSETS = [
   './app.js',
   './firebase-config.js',
   './manifest.json',
+  './logo-mark.png',
+  './logo-full.png',
+  './icon-192.png',
+  './icon-512.png',
+  './favicon.png',
   './icon-192.svg',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css'
 ];
@@ -60,7 +65,7 @@ self.addEventListener('fetch', e => {
 
 // ─── Push Notifications from Server ───
 self.addEventListener('push', e => {
-  let title = 'IB Student Planner';
+  let title = 'Gradia Workspace';
   let body  = 'Upcoming class or task reminder!';
   let data  = { url: './index.html' };
   if (e.data) {
@@ -76,8 +81,8 @@ self.addEventListener('push', e => {
   e.waitUntil(
     self.registration.showNotification(title, {
       body,
-      icon: './icon-192.svg',
-      badge: './icon-192.svg',
+      icon: './icon-192.png',
+      badge: './icon-192.png',
       vibrate: [200, 100, 200],
       data
     })
@@ -89,12 +94,12 @@ self.addEventListener('message', e => {
   if (e.data && e.data.type === 'SHOW_NOTIFICATION') {
     const { title, options } = e.data;
     e.waitUntil(
-      self.registration.showNotification(title || 'IB Student Planner', {
+      self.registration.showNotification(title || 'Gradia Workspace', {
         body: options?.body || '',
-        icon: options?.icon || './icon-192.svg',
-        badge: options?.badge || './icon-192.svg',
+        icon: options?.icon || './icon-192.png',
+        badge: options?.badge || './icon-192.png',
         vibrate: options?.vibrate || [200, 100, 200],
-        tag: options?.tag || 'ib-alert-' + Date.now(),
+        tag: options?.tag || 'gradia-alert-' + Date.now(),
         data: options?.data || { url: './index.html' }
       })
     );

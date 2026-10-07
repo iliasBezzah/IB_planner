@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>IB Planner — Login</title>
+  <title>Gradia — Academic Workspace &amp; Collaboration Hub</title>
+  <link rel="icon" type="image/png" href="favicon.png"/>
+  <link rel="apple-touch-icon" href="icon-192.png"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
 
   <!-- Firebase App & Auth SDKs -->
@@ -17,9 +19,9 @@
 
     html { height: 100%; }
     body {
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       min-height: 100%;
-      background: linear-gradient(135deg, #0D47A1 0%, #1565C0 45%, #0288D1 100%);
+      background: linear-gradient(135deg, #0F172A 0%, #1E1B4B 50%, #312E81 100%);
       background-attachment: fixed;
       display: flex;
       align-items: flex-start;
@@ -33,7 +35,7 @@
       content: '';
       position: fixed;
       border-radius: 50%;
-      background: rgba(255,255,255,0.05);
+      background: rgba(255,255,255,0.04);
       pointer-events: none;
       z-index: 0;
     }
@@ -52,35 +54,30 @@
       margin-bottom: 24px;
       color: #fff;
     }
-    .logo-badge {
-      width: 68px; height: 68px;
-      background: rgba(255,255,255,0.18);
-      border: 2.5px solid rgba(255,255,255,0.5);
-      border-radius: 18px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 26px;
-      font-weight: 900;
-      letter-spacing: -2px;
-      margin-bottom: 10px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    .login-logo-img {
+      width: 78px;
+      height: 78px;
+      object-fit: contain;
+      margin-bottom: 8px;
+      filter: drop-shadow(0 10px 24px rgba(0,0,0,0.45));
+      display: inline-block;
     }
-    .logo-title { font-size: 21px; font-weight: 800; }
-    .logo-sub   { font-size: 12px; opacity: 0.85; margin-top: 3px; }
+    .logo-title { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+    .logo-sub   { font-size: 12px; opacity: 0.85; margin-top: 3px; font-weight: 400; }
 
     .card {
       background: #fff;
       border-radius: 20px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+      border: 1px solid rgba(255,255,255,0.1);
       overflow: hidden;
     }
 
     .tabs {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      background: #F0F7FF;
-      border-bottom: 1px solid #BBDEFB;
+      background: #F8FAFC;
+      border-bottom: 1px solid #E2E8F0;
     }
     .tab-btn {
       padding: 15px;
@@ -88,7 +85,7 @@
       background: none;
       font-size: 14px;
       font-weight: 600;
-      color: #546E7A;
+      color: #64748B;
       cursor: pointer;
       transition: all 0.2s;
       display: flex;
@@ -98,16 +95,16 @@
       border-bottom: 3px solid transparent;
     }
     .tab-btn.active {
-      color: #1565C0;
-      border-bottom-color: #1565C0;
+      color: #4F46E5;
+      border-bottom-color: #4F46E5;
       background: #fff;
     }
-    .tab-btn:hover:not(.active) { color: #1976D2; }
+    .tab-btn:hover:not(.active) { color: #4338CA; }
 
     .form-panel { display: none; padding: 26px 28px; }
     .form-panel.active { display: block; }
 
-    .form-title    { font-size: 18px; font-weight: 800; color: #0D1B2A; margin-bottom: 4px; }
+    .form-title    { font-size: 18px; font-weight: 800; color: #0F172A; margin-bottom: 4px; }
     .form-subtitle { font-size: 13px; color: #546E7A; margin-bottom: 20px; }
 
     .form-group { margin-bottom: 14px; }
@@ -137,21 +134,21 @@
     .input-wrap input {
       width: 100%;
       padding: 10px 42px 10px 36px;
-      border: 1.5px solid #BBDEFB;
+      border: 1.5px solid #E2E8F0;
       border-radius: 10px;
       font-size: 14px;
-      color: #0D1B2A;
-      background: #F8FBFF;
+      color: #0F172A;
+      background: #F8FAFC;
       transition: border-color 0.2s, box-shadow 0.2s;
       font-family: inherit;
     }
     .input-wrap input:focus {
       outline: none;
-      border-color: #1565C0;
+      border-color: #4F46E5;
       background: #fff;
-      box-shadow: 0 0 0 3px rgba(21,101,192,0.1);
+      box-shadow: 0 0 0 3px rgba(79,70,229,0.12);
     }
-    .input-wrap input.error { border-color: #C62828; box-shadow: 0 0 0 3px rgba(198,40,40,0.1); }
+    .input-wrap input.error { border-color: #EF4444; box-shadow: 0 0 0 3px rgba(239,68,68,0.12); }
 
     .toggle-pw {
       position: absolute;
@@ -161,7 +158,7 @@
       width: 40px;
       background: none;
       border: none;
-      color: #90A4AE;
+      color: #94A3B8;
       cursor: pointer;
       font-size: 15px;
       display: flex;
@@ -170,7 +167,7 @@
       transition: color 0.2s;
       z-index: 2;
     }
-    .toggle-pw:hover { color: #1565C0; }
+    .toggle-pw:hover { color: #4F46E5; }
 
     .role-group {
       display: grid;
@@ -179,20 +176,20 @@
       margin-bottom: 14px;
     }
     .role-card {
-      border: 2px solid #BBDEFB;
+      border: 2px solid #E2E8F0;
       border-radius: 12px;
       padding: 14px 10px;
       text-align: center;
       cursor: pointer;
       transition: all 0.2s;
-      background: #F8FBFF;
+      background: #F8FAFC;
       position: relative;
     }
-    .role-card:hover { border-color: #1565C0; background: #EBF3FB; }
+    .role-card:hover { border-color: #4F46E5; background: #EEF2FF; }
     .role-card.selected {
-      border-color: #1565C0;
-      background: #EBF3FB;
-      box-shadow: 0 0 0 3px rgba(21,101,192,0.12);
+      border-color: #4F46E5;
+      background: #EEF2FF;
+      box-shadow: 0 0 0 3px rgba(79,70,229,0.12);
     }
     .role-card input[type="radio"] {
       position: absolute;
@@ -200,12 +197,12 @@
       width: 0; height: 0;
     }
     .role-icon { font-size: 26px; display: block; margin-bottom: 6px; }
-    .role-label { font-size: 12px; font-weight: 700; color: #0D1B2A; }
-    .role-sub   { font-size: 10px; color: #546E7A; margin-top: 2px; }
+    .role-label { font-size: 12px; font-weight: 700; color: #0F172A; }
+    .role-sub   { font-size: 10px; color: #64748B; margin-top: 2px; }
 
     .pw-rules {
-      background: #F0F7FF;
-      border: 1px solid #BBDEFB;
+      background: #EEF2FF;
+      border: 1px solid #C7D2FE;
       border-radius: 8px;
       padding: 10px 12px;
       margin-top: 8px;
@@ -217,7 +214,7 @@
       align-items: center;
       gap: 7px;
       font-size: 11px;
-      color: #546E7A;
+      color: #475569;
       padding: 2px 0;
       transition: color 0.2s;
     }
@@ -225,16 +222,16 @@
       font-size: 11px;
       width: 14px;
       text-align: center;
-      color: #90A4AE;
+      color: #94A3B8;
       transition: color 0.2s;
     }
-    .pw-rule.ok     { color: #2E7D32; }
-    .pw-rule.ok i   { color: #2E7D32; }
-    .pw-rule.fail i { color: #C62828; }
+    .pw-rule.ok     { color: #059669; }
+    .pw-rule.ok i   { color: #059669; }
+    .pw-rule.fail i { color: #DC2626; }
 
     .error-msg {
       font-size: 11px;
-      color: #C62828;
+      color: #DC2626;
       margin-top: 5px;
       display: none;
       align-items: center;
@@ -250,10 +247,10 @@
     }
     .remember-row input[type="checkbox"] {
       width: 16px; height: 16px;
-      accent-color: #1565C0;
+      accent-color: #4F46E5;
       cursor: pointer;
     }
-    .remember-row label { font-size: 13px; color: #546E7A; cursor: pointer; margin: 0; }
+    .remember-row label { font-size: 13px; color: #64748B; cursor: pointer; margin: 0; }
 
     .alert {
       padding: 10px 14px;
@@ -266,13 +263,13 @@
       gap: 8px;
     }
     .alert.show { display: flex; }
-    .alert.error   { background: #FFEBEE; color: #C62828; border: 1px solid #FFCDD2; }
-    .alert.success { background: #E8F5E9; color: #2E7D32; border: 1px solid #C8E6C9; }
+    .alert.error   { background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; }
+    .alert.success { background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; }
 
     .btn-submit {
       width: 100%;
       padding: 13px;
-      background: linear-gradient(135deg, #1565C0, #0288D1);
+      background: linear-gradient(135deg, #4F46E5, #4338CA);
       color: #fff;
       border: none;
       border-radius: 10px;
@@ -284,11 +281,12 @@
       align-items: center;
       justify-content: center;
       gap: 8px;
+      box-shadow: 0 4px 12px rgba(79,70,229,0.25);
     }
     .btn-submit:hover {
-      background: linear-gradient(135deg, #0D47A1, #1565C0);
+      background: linear-gradient(135deg, #4338CA, #3730A3);
       transform: translateY(-1px);
-      box-shadow: 0 6px 20px rgba(21,101,192,0.35);
+      box-shadow: 0 6px 20px rgba(79,70,229,0.35);
     }
     .btn-submit:active { transform: none; }
     .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
@@ -299,7 +297,7 @@
       justify-content: center;
       gap: 6px;
       font-size: 11px;
-      color: #0288D1;
+      color: #4F46E5;
       margin-top: 15px;
       font-weight: 600;
     }
@@ -307,10 +305,10 @@
     .switch-link {
       text-align: center;
       font-size: 13px;
-      color: #546E7A;
+      color: #64748B;
       margin-top: 14px;
     }
-    .switch-link a { color: #1565C0; font-weight: 700; cursor: pointer; }
+    .switch-link a { color: #4F46E5; font-weight: 700; cursor: pointer; }
     .switch-link a:hover { text-decoration: underline; }
 
     .login-footer {
@@ -330,9 +328,9 @@
 <div class="login-wrapper">
 
   <div class="logo-section">
-    <div class="logo-badge">IB</div>
-    <div class="logo-title">IB Planner</div>
-    <div class="logo-sub">Cloud-Synced Academic Manager</div>
+    <img src="logo-mark.png" alt="Gradia Emblem" class="login-logo-img"/>
+    <div class="logo-title">Gradia</div>
+    <div class="logo-sub">Academic Workspace &amp; Collaboration Hub</div>
   </div>
 
   <div class="card">
@@ -367,7 +365,7 @@
       <div class="form-group">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
           <label style="margin:0">Password</label>
-          <a class="forgot-link" onclick="forgotPassword()" style="font-size:12px;color:#1565C0;cursor:pointer;font-weight:600">Forgot password?</a>
+          <a class="forgot-link" onclick="forgotPassword()" style="font-size:12px;color:#4F46E5;cursor:pointer;font-weight:600">Forgot password?</a>
         </div>
         <div class="input-wrap">
           <i class="fas fa-lock input-icon"></i>
@@ -507,10 +505,13 @@
 function formatAuthEmail(input) {
   const clean = input.trim().toLowerCase();
   if (clean.includes('@')) return clean;
-  return clean + '@ibplanner.cloud';
+  return clean + '@gradia.app';
 }
 
 function extractUsername(emailOrUser) {
+  if (emailOrUser.includes('@gradia.app')) {
+    return emailOrUser.split('@')[0];
+  }
   if (emailOrUser.includes('@ibplanner.cloud')) {
     return emailOrUser.split('@')[0];
   }

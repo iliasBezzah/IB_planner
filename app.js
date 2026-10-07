@@ -1,5 +1,6 @@
 /* ╔══════════════════════════════════════════════════════╗
-   ║  IB Student Day Planner v2 — Application Logic       ║
+   ║  Gradia — Academic Management Platform              ║
+   ║  Client-Side Core Application Logic                  ║
    ╚══════════════════════════════════════════════════════╝ */
 
 'use strict';
@@ -12,7 +13,7 @@ let currentWeekStart = getWeekStart(new Date());
 let currentMonth     = { year: new Date().getFullYear(), month: new Date().getMonth() };
 let db               = {};
 let globalData       = {};
-let selectedColor    = '#1565C0';
+let selectedColor    = '#4F46E5';
 let deferredInstall  = null;
 
 // ── Current logged-in user ──
@@ -44,7 +45,7 @@ const CAT_ICONS = {
 };
 
 const CAT_COLORS = {
-  lecture:    '#1565C0',
+  lecture:    '#4F46E5',
   study:      '#1A237E',
   assignment: '#6A1B9A',
   exam:       '#C62828',
@@ -1451,13 +1452,13 @@ async function fireNotification(title, body, data = {}){
 
   if(!('Notification' in window) || Notification.permission !== 'granted') return;
 
-  const notifTitle = 'IB Student — ' + title;
+  const notifTitle = 'Gradia — ' + title;
   const options = {
     body,
-    icon: './icon-192.svg',
-    badge: './icon-192.svg',
+    icon: './icon-192.png',
+    badge: './icon-192.png',
     vibrate: [200, 100, 200],
-    tag: data.tag || 'ib-' + uid(),
+    tag: data.tag || 'gradia-' + uid(),
     data: Object.assign({ url: './index.html' }, data)
   };
 
@@ -5017,7 +5018,7 @@ document.addEventListener('click', (e) => {
 
 function logout() {
   closeUserDropdown();
-  if (!confirm('Sign out of IB Student Planner?')) return;
+  if (!confirm('Sign out of Gradia Academic Workspace?')) return;
   if (typeof firebase !== 'undefined' && firebase.apps.length) {
     firebase.auth().signOut().catch(() => {});
   }
@@ -5879,10 +5880,10 @@ function exportScheduleICS() {
   let ics = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//IB Planner//Academic Timetable//EN',
+    'PRODID:-//Gradia//Academic Workspace//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
-    'X-WR-CALNAME:IB Academic Schedule',
+    'X-WR-CALNAME:Gradia Academic Schedule',
     'X-WR-TIMEZONE:UTC'
   ];
 
@@ -5901,7 +5902,7 @@ function exportScheduleICS() {
     }
 
     ics.push('BEGIN:VEVENT');
-    ics.push(`UID:recur-${r.id}@ibplanner.edu`);
+    ics.push(`UID:recur-${r.id}@gradia.app`);
     ics.push(`DTSTAMP:${nowICS}`);
     ics.push(`DTSTART:${dtStart}`);
     ics.push(`DTEND:${dtEnd}`);
@@ -5917,7 +5918,7 @@ function exportScheduleICS() {
       if (due) {
         const dtDue = formatICSDate(due, a.dueTime || '23:59');
         ics.push('BEGIN:VEVENT');
-        ics.push(`UID:asgn-${a.id}@ibplanner.edu`);
+        ics.push(`UID:asgn-${a.id}@gradia.app`);
         ics.push(`DTSTAMP:${nowICS}`);
         ics.push(`DTSTART:${dtDue}`);
         ics.push(`DTEND:${dtDue}`);
@@ -5936,7 +5937,7 @@ function exportScheduleICS() {
           const dtStart = formatICSDate(date, e.start);
           const dtEnd = formatICSDate(date, e.end);
           ics.push('BEGIN:VEVENT');
-          ics.push(`UID:event-${e.id}@ibplanner.edu`);
+          ics.push(`UID:event-${e.id}@gradia.app`);
           ics.push(`DTSTAMP:${nowICS}`);
           ics.push(`DTSTART:${dtStart}`);
           ics.push(`DTEND:${dtEnd}`);
@@ -5954,12 +5955,12 @@ function exportScheduleICS() {
   const icsBlob = new Blob([ics.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
   const downloadLink = document.createElement('a');
   downloadLink.href = URL.createObjectURL(icsBlob);
-  downloadLink.download = `IB_Academic_Schedule_${todayStr()}.ics`;
+  downloadLink.download = `Gradia_Academic_Schedule_${todayStr()}.ics`;
   document.body.appendChild(downloadLink);
   downloadLink.click();
   document.body.removeChild(downloadLink);
 
-  showToast('📅 Academic schedule exported (.ics)! Ready for Google Calendar or Outlook.', 4500);
+  showToast('📅 Gradia academic schedule exported (.ics)! Ready for Google Calendar or Apple Calendar.', 4500);
 }
 
 
