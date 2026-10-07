@@ -100,6 +100,7 @@
       background: #fff;
     }
     .tab-btn:hover:not(.active) { color: #4338CA; }
+    .tab-btn:active { transform: scale(0.97); }
 
     .form-panel { display: none; padding: 26px 28px; }
     .form-panel.active { display: block; }
@@ -186,6 +187,7 @@
       position: relative;
     }
     .role-card:hover { border-color: #4F46E5; background: #EEF2FF; }
+    .role-card:active { transform: scale(0.98); }
     .role-card.selected {
       border-color: #4F46E5;
       background: #EEF2FF;
@@ -288,7 +290,7 @@
       transform: translateY(-1px);
       box-shadow: 0 6px 20px rgba(79,70,229,0.35);
     }
-    .btn-submit:active { transform: none; }
+    .btn-submit:active { transform: scale(0.98); }
     .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
 
     .cloud-badge {
@@ -320,6 +322,19 @@
 
     @media(max-width: 480px) {
       .form-panel { padding: 20px 16px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+      }
+      .tab-btn, .role-card, .btn-submit {
+        transform: none !important;
+        transition: none !important;
+      }
     }
   </style>
 </head>

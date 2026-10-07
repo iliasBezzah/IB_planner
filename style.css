@@ -321,16 +321,22 @@ body[data-theme="dark"] ::-webkit-scrollbar-thumb{background:#334155;}
   width: 220px;
   z-index: 2000;
   padding: 8px;
-  display: none;
-  animation: dropFade 0.2s ease-out;
+  display: block;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: scale(0.95) translateY(-6px);
+  transform-origin: top right;
+  transition: opacity 180ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+              visibility 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
 }
 .user-menu-container.open .user-dropdown-menu {
-  display: block;
-}
-
-@keyframes dropFade {
-  from { opacity: 0; transform: translateY(-6px); }
-  to { opacity: 1; transform: translateY(0); }
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: scale(1) translateY(0);
 }
 
 .ud-header {
@@ -444,9 +450,16 @@ body[data-theme="dark"] ::-webkit-scrollbar-thumb{background:#334155;}
 /* ════════════════════════════════════════
    MAIN CONTENT
 ════════════════════════════════════════ */
-.main-content{padding:20px 24px;max-width:1600px;margin:0 auto;}
 .view{display:none;}
-.view.active{display:block;}
+.view.active{
+  display:block;
+  animation:viewEntrance 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change:transform, opacity;
+}
+@keyframes viewEntrance{
+  0%{opacity:0;transform:translateY(8px);}
+  100%{opacity:1;transform:translateY(0);}
+}
 
 /* ─── Day Selector Bar ─── */
 .day-selector-bar{display:flex;align-items:center;gap:10px;background:var(--surface);padding:10px 18px;border-radius:var(--radius);box-shadow:0 2px 12px var(--shadow);margin-bottom:18px;border:1px solid var(--border);}
@@ -801,17 +814,90 @@ select{cursor:pointer;}
 textarea{resize:vertical;}
 
 /* ════════════════════════════════════════
-   MODALS
+   MODALS & OVERLAYS
 ════════════════════════════════════════ */
-.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,20,50,.55);backdrop-filter:blur(4px);z-index:2000;align-items:center;justify-content:center;padding:16px;}
-.modal-overlay.open{display:flex;}
-.modal{background:var(--surface);border-radius:var(--radius);box-shadow:0 20px 60px rgba(0,20,50,.4);width:100%;max-width:480px;max-height:90vh;overflow-y:auto;animation:modalIn .25s ease;}
-.modal-lg{max-width:600px;}
-@keyframes modalIn{from{transform:scale(.92) translateY(-20px);opacity:0;}to{transform:scale(1) translateY(0);opacity:1;}}
-.modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);background:linear-gradient(135deg,var(--primary-dark) 0%,var(--primary) 100%);color:#fff;}
-.modal-header h3{font-size:15px;display:flex;align-items:center;gap:7px;}
-.modal-close{background:rgba(255,255,255,.15);border:none;color:#fff;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:background var(--transition);}
-.modal-close:hover{background:rgba(255,255,255,.3);}
+.modal-overlay {
+  display: flex;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 2000;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 200ms cubic-bezier(0.16, 1, 0.3, 1),
+              visibility 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity;
+}
+.modal-overlay.open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+.modal {
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.35);
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  transform: scale(0.95);
+  opacity: 0;
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+.modal-overlay.open .modal {
+  transform: scale(1);
+  opacity: 1;
+}
+.modal-lg {
+  max-width: 680px;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+  color: #fff;
+}
+.modal-header h3 {
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.modal-close {
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: #fff;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1),
+              background 150ms ease;
+}
+.modal-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: rotate(90deg);
+}
+.modal-close:active {
+  transform: rotate(90deg) scale(0.9);
+}
 .modal-body{padding:20px;display:flex;flex-direction:column;gap:14px;}
 .modal-footer{display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--border);background:var(--surface2);}
 .form-group{display:flex;flex-direction:column;gap:5px;}
@@ -1224,7 +1310,18 @@ textarea{resize:vertical;}
 }
 .course-tab-panel.active {
   display: block;
-  animation: fadeIn 0.2s ease;
+  animation: courseTabEntrance 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+@keyframes courseTabEntrance {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .cd-section-head {
   display: flex;
@@ -1801,7 +1898,7 @@ textarea{resize:vertical;}
   display: none;
 }
 .notif-dropdown-menu {
-  display: none;
+  display: block;
   position: absolute;
   top: calc(100% + 10px);
   right: 0;
@@ -1810,13 +1907,24 @@ textarea{resize:vertical;}
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
-  box-shadow: 0 12px 36px var(--shadow);
+  box-shadow: 0 12px 36px var(--shadow-lg);
   z-index: 999;
   overflow: hidden;
-  animation: dropdownIn 0.2s ease;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: scale(0.95) translateY(-6px);
+  transform-origin: top right;
+  transition: opacity 180ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+              visibility 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
 }
 .notif-menu-container.open .notif-dropdown-menu {
-  display: block;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: scale(1) translateY(0);
 }
 .notif-dropdown-header {
   display: flex;
@@ -3579,6 +3687,122 @@ textarea{resize:vertical;}
   color: #fff;
 }
 
+/* ══════════════════════════════════════════════════════
+   TACTILE MICRO-INTERACTIONS & CARD HOVER LIFTS
+══════════════════════════════════════════════════════ */
+button:active,
+.btn-primary:active,
+.btn-secondary:active,
+.btn-danger:active,
+.btn-role-action:active,
+.btn-submit:active,
+.btn-sync-cloud:active,
+.btn-text-sm:active,
+.nav-btn:active,
+.tab-btn:active,
+.course-tab-btn:active,
+.goal-chip:active,
+.filter-btn:active,
+.pomo-btn:active,
+.pomo-preset-btn:active,
+.user-badge-btn:active,
+.notif-bell-btn:active,
+.modal-close:active,
+.ev-btn:active,
+.day-pill:active,
+.cal-tab-btn:active,
+.time-slot-btn:active,
+.contact-pill-opt:active,
+.interval-chip:active,
+.sub-link-chip:active {
+  transform: scale(0.97) !important;
+}
 
+.event-card,
+.task-item,
+.teacher-course-card,
+.course-card,
+.cd-assignment-item,
+.next-up-card,
+.urgent-deadline-card,
+.note-card,
+.cd-note-card,
+.ec-item,
+.tl-event,
+.week-event,
+.pomo-widget-card,
+.gsc-card {
+  transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 150ms cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 150ms ease;
+  will-change: transform;
+}
 
+.event-card:hover,
+.task-item:hover,
+.teacher-course-card:hover,
+.course-card:hover,
+.cd-assignment-item:hover,
+.next-up-card:hover,
+.urgent-deadline-card:hover,
+.note-card:hover,
+.cd-note-card:hover,
+.ec-item:hover,
+.tl-event:hover,
+.week-event:hover,
+.pomo-widget-card:hover,
+.gsc-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.04);
+}
 
+.event-card:active,
+.task-item:active,
+.teacher-course-card:active,
+.course-card:active,
+.cd-assignment-item:active,
+.next-up-card:active,
+.urgent-deadline-card:active,
+.note-card:active,
+.cd-note-card:active,
+.ec-item:active,
+.tl-event:active,
+.week-event:active,
+.pomo-widget-card:active,
+.gsc-card:active {
+  transform: scale(0.985);
+}
+
+/* ─── Accessibility: Reduced Motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .modal-overlay,
+  .modal,
+  .view.active,
+  .course-tab-panel.active,
+  .user-dropdown-menu,
+  .notif-dropdown-menu,
+  .event-card,
+  .task-item,
+  .teacher-course-card,
+  .course-card,
+  .cd-assignment-item,
+  .next-up-card,
+  .urgent-deadline-card,
+  .note-card,
+  .cd-note-card,
+  .ec-item,
+  .tl-event,
+  .week-event,
+  .pomo-widget-card,
+  .gsc-card {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}

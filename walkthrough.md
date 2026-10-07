@@ -1,80 +1,107 @@
-# Walkthrough — Visual Redesign & Official Gradia Logo Integration
+# Walkthrough — Modern CSS Animations, Micro-Interactions & Official Rebranding
 
-We have integrated your official **Gradia** logo and emblem across the entire web application, login portal, PWA configuration, and service worker cache.
-
----
-
-## 1. Official Logo & Emblem Assets
-
-From your uploaded artwork, we generated high-resolution transparent assets:
-
-| Asset File | Resolution | Description & Usage |
-| :--- | :--- | :--- |
-| `logo-mark.png` | 336 × 336 | Standalone octagonal intertwining ribbon "G" emblem with vibrant indigo and electric blue gradients. Used in the header, login page, and modal dialogs. |
-| `logo-full.png` | 561 × 200 | Full brand identity containing the "G" ribbon emblem alongside the clean white "Gradia" wordmark. |
-| `icon-192.png` | 192 × 192 | Standard PWA icon & browser push notification badge. |
-| `icon-512.png` | 512 × 512 | High-res splash screen icon for mobile and desktop PWA installation. |
-| `favicon.png` | 64 × 64 | Browser tab favicon for crisp rendering on high-DPI displays. |
-| `icon-192.svg` | 192 × 192 | Vector SVG wrapper embedding the high-resolution emblem for SVG-first browsers. |
+We have implemented a comprehensive suite of smooth, modern CSS animations and tactile micro-interactions across the Gradia UI, along with official brand identity integration and complete synchronization with your desktop directory.
 
 ---
 
-## 2. Where the Logo Is Integrated
+## 1. Smooth Modals, Drawers & Overlays
 
-1. **Top Navigation Bar (`index.html`)**:
-   - Replaced placeholder CSS text marks with the official emblem:
-     ```html
-     <div class="logo">
-       <img src="logo-mark.png" alt="Gradia Logo" class="logo-gradia-img"/>
-       <div class="logo-text">
-         <span class="brand-title">Gradia</span>
-         <span class="brand-sub" id="brandSub">Academic Workspace &amp; Collaboration Hub</span>
-       </div>
-     </div>
-     ```
-   - Includes subtle hover scale animation (`transform: scale(1.06)`) and soft depth drop shadow.
-
-2. **Login & Registration Portal (`login.html`)**:
-   - Replaced the CSS badge with the full-sized emblem:
-     ```html
-     <div class="logo-section">
-       <img src="logo-mark.png" alt="Gradia Emblem" class="login-logo-img"/>
-       <div class="logo-title">Gradia</div>
-       <div class="logo-sub">Academic Workspace &amp; Collaboration Hub</div>
-     </div>
-     ```
-   - Styled with `filter: drop-shadow(0 10px 24px rgba(0,0,0,0.45))` against the deep slate/indigo gradient backdrop.
-
-3. **PWA App Installation Modal (`installHelpModal`)**:
-   - Centered 58px high-resolution emblem inside the device installation modal.
-
-4. **PWA Manifest & Browser Tabs (`manifest.json` & `<head>`)**:
-   - Added `favicon.png` to browser head:
-     ```html
-     <link rel="icon" type="image/png" href="favicon.png"/>
-     <link rel="apple-touch-icon" href="icon-192.png"/>
-     ```
-   - Configured `icon-192.png` and `icon-512.png` in `manifest.json` with `"purpose": "any maskable"`.
-
-5. **Service Worker & Push Notifications (`sw.js`)**:
-   - Added all logo PNGs to the cache preload list (`ASSETS`).
-   - Push notifications now display the emblem as both the alert icon and status bar badge.
+- **Synchronized Entrance & Exit**:
+  - Replaced abrupt `display: none` toggling with smooth GPU-accelerated transitions:
+    ```css
+    .modal-overlay {
+      display: flex;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      background: rgba(15, 23, 42, 0.65);
+      transition: opacity 200ms cubic-bezier(0.16, 1, 0.3, 1),
+                  visibility 200ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .modal-overlay.open {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+    .modal {
+      transform: scale(0.95);
+      opacity: 0;
+      transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+                  opacity 200ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .modal-overlay.open .modal {
+      transform: scale(1);
+      opacity: 1;
+    }
+    ```
+- **Modern Backdrop Blur**: Soft `blur(4px)` with synchronized `rgba(15, 23, 42, 0.65)` scrim creates deep academic focus when inspecting course details or creating assignments.
+- **Micro-Animated Controls**: Modal close buttons rotate 90° on hover (`transform: rotate(90deg)`) and depress on active press (`transform: rotate(90deg) scale(0.9)`).
+- **GPU-Accelerated Drawers & Dropdowns**: User profile menu and in-app notification center scale smoothly from 0.95 to 1.0 with 180ms ease-out transitions anchored to top-right.
 
 ---
 
-## 3. Files Synchronized to Desktop
+## 2. Interactive Cards & Surface Micro-Interactions
 
-All updated assets and source files are mirrored to `C:\Users\Lenovo\Desktop\IB-Planner\`:
-- `logo-mark.png`
-- `logo-full.png`
-- `icon-192.png`
-- `icon-512.png`
-- `favicon.png`
-- `icon-192.svg`
-- `index.html`
-- `login.html`
-- `style.css`
-- `app.js`
-- `sw.js`
-- `manifest.json`
-- `walkthrough.md`
+- **Card Hover Elevation (150ms)**:
+  - Subtle physical lift (`transform: translateY(-2px)`) with elevated soft shadow (`box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.04)`) across:
+    - Course cards & Teacher course hub cards
+    - Daily timetable rows & Weekly timetable blocks (`.event-card`, `.tl-event`, `.week-event`)
+    - Assignment task items (`.task-item`, `.cd-assignment-item`)
+    - "Next Up" Banner & Urgent Deadline cards
+    - Course notebook cards & Pomodoro timer container
+- **Tactile Click Feedback (`:active`)**:
+  - Buttons, chips, day pills, and navigation tabs instantly press down to `transform: scale(0.97)` on click or tap, providing immediate physical responsiveness.
+  - Interactive cards depress smoothly to `transform: scale(0.985)` when tapped.
+
+---
+
+## 3. Fluid Tab & View Transitions
+
+- **Main Navigation Views**:
+  - Switching between views (Timeline, Assignments, Courses, Analytics, Teacher Hub) triggers `@keyframes viewEntrance`:
+    ```css
+    @keyframes viewEntrance {
+      0%   { opacity: 0; transform: translateY(8px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+    ```
+  - Eliminates abrupt layout snapping while keeping transition time crisp (200ms).
+- **Inner Course Detail Sub-Tabs**:
+  - Toggling between Course Timeline, Assignments, Syllabus, and Notes animates via `@keyframes courseTabEntrance` (`translateY(6px)` to `0` over 180ms).
+
+---
+
+## 4. Accessibility & Performance Compliance
+
+- **GPU Acceleration Only**:
+  - Every animation strictly modifies `transform` and `opacity` properties to prevent costly DOM reflows and layout thrashing, ensuring locked 60 FPS performance.
+- **Reduced Motion Support**:
+  - Included `@media (prefers-reduced-motion: reduce)` media query across both `style.css` and `login.html`:
+    ```css
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+      }
+      .modal-overlay, .modal, .view.active, .course-tab-panel.active {
+        animation: none !important;
+        transition: none !important;
+        transform: none !important;
+      }
+    }
+    ```
+
+---
+
+## 5. Mirrored Files
+
+All updated files have been synchronized with `C:\Users\Lenovo\Desktop\IB-Planner\`:
+- [style.css](file:///C:/Users/Lenovo/Desktop/IB-Planner/style.css) — Micro-interactions, hover lifts, reduced-motion rules
+- [login.html](file:///C:/Users/Lenovo/Desktop/IB-Planner/login.html) — Tactile button & card press feedback, reduced-motion
+- [index.html](file:///C:/Users/Lenovo/Desktop/IB-Planner/index.html) — Cache-busted stylesheet link (`v=17`)
+- [sw.js](file:///C:/Users/Lenovo/Desktop/IB-Planner/sw.js) — Updated ServiceWorker cache name (`gradia-v17`)
+- [walkthrough.md](file:///C:/Users/Lenovo/Desktop/IB-Planner/walkthrough.md)

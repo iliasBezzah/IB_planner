@@ -2,7 +2,7 @@
    ║  Gradia — Academic Workspace & Hub (PWA Offline)     ║
    ╚══════════════════════════════════════════════════════╝ */
 
-const CACHE_NAME = 'gradia-v16';
+const CACHE_NAME = 'gradia-v17';
 const ASSETS = [
   './',
   './index.html',
